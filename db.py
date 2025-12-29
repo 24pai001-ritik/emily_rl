@@ -289,27 +289,6 @@ def get_post_metrics(post_id, platform):
         return None
 
 
-def get_post_metrics(post_id, platform):
-    """Fetch real metrics for a post from database"""
-    try:
-        res = supabase.table("post_snapshots") \
-            .select("*") \
-            .eq("post_id", post_id) \
-            .eq("platform", platform) \
-            .execute()
-
-        if res.data and len(res.data) > 0:
-            # Return the metrics dict, excluding metadata fields
-            row = res.data[0]
-            metrics = {k: v for k, v in row.items()
-                      if k not in ['post_id', 'platform', 'created_at', 'id']}
-            return metrics
-        return None
-    except Exception as e:
-        print(f"Error fetching metrics for post {post_id}: {e}")
-        return None
-
-
 def get_real_platform_metrics(post_id, platform):
     """Get real metrics from database or API"""
     # Option 1: Fetch from your database
