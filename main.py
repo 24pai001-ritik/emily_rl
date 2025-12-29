@@ -11,6 +11,7 @@ Flow:
 6. Compute reward
 7. Update RL
 """
+from db import fetch_or_calculate_reward
 
 import uuid
 import time
@@ -63,6 +64,10 @@ def run_one_post(topic, platform, date, time):
     # ---------- 2️⃣ GENERATE PROMPTS (RL INSIDE) ----------
     inputs = {
         "BUSINESS_CONTEXT": business_embedding,
+        "BUSINESS_AESTHETIC": "modern, professional, clean design",  # Default aesthetic
+        "BUSINESS_TYPES": ["Technology"],  # Default business types
+        "INDUSTRIES": ["Technology/IT"],  # Default industries
+        "BUSINESS_DESCRIPTION": "A technology company focused on AI and marketing solutions",  # Default description
         "TOPIC": topic,
         "PLATFORM": platform,
         "DATE": date,
@@ -96,15 +101,24 @@ def run_one_post(topic, platform, date, time):
     )
 
     # ---------- 4️⃣ STORE POST CONTENT ----------
+    # Extract prompts based on mode (handle both trendy and standard modes)
+    image_prompt = result.get("image_prompt",
+        f"Create an image for topic: {topic} with {action['VISUAL_STYLE']} style, {action['TONE']} tone, {action['CREATIVITY']} creativity level. Make it engaging for {platform}.")
+
+    caption_prompt = result.get("caption_prompt",
+        f"Write a {action['TONE']} caption about {topic} in {action['LENGTH']} length with {action['CREATIVITY']} creativity level. Make it suitable for {platform}.")
+
     db.insert_post_content(
         post_id=post_id,
         action_id=action_id,
         platform=platform,
         business_id=BUSINESS_ID,
         topic=topic,
-        # post_type=post_type,
-        image_prompt=result["image_prompt"],
-        caption_prompt="(caption prompt generated later)",
+        post_type="educational",  # Default post type
+        business_context=str(business_embedding),  # Convert embedding to string
+        business_aesthetic="modern, professional, clean design",  # Default aesthetic
+        image_prompt=image_prompt,
+        caption_prompt=caption_prompt,
         status="generated"
     )
 
@@ -116,46 +130,39 @@ def run_one_post(topic, platform, date, time):
 
     db.mark_post_as_posted(post_id)
 
-    # ---------- 6️⃣ COLLECT METRICS ----------
-    metrics = db.get_real_platform_metrics(post_id, platform)
-    print("📊 Metrics:", metrics)
+    # Create initial reward record for future calculation
+    db.create_post_reward_record(BUSINESS_ID, post_id, platform)
 
-    # ---------- 7️⃣ STORE SNAPSHOT ----------
-    db.insert_post_snapshot(
+    # ---------- 6️⃣ FETCH OR CALCULATE REWARD ----------
+    reward_result = fetch_or_calculate_reward(
+        profile_id=BUSINESS_ID,  # Using BUSINESS_ID instead of profile.id
         post_id=post_id,
-        platform=platform,
-        metrics=metrics
+        platform=platform
     )
 
-    # ---------- 8️⃣ COMPUTE & STORE REWARD ----------
-    reward = compute_reward(
-    platform=platform,
-    metrics=metrics,
-    deleted=False,
-    days_since_post=None
-    )
+    if reward_result["status"] == "pending":
+        # ⛔ DO NOTHING - reward not ready yet
+        print("⏳ Reward not ready yet - skipping RL update")
+        return
 
+    # ✅ Reward is ready → continue RL process
+    reward = reward_result["reward"]
+    print(f"🏆 Reward={reward:.3f}")
 
+    # Get baseline for this reward
     baseline = db.update_and_get_baseline(
         platform=platform,
         reward=reward
     )
 
-    db.insert_reward(
-        action_id=action_id,  # Changed from post_id to action_id
-        reward=reward,
-        baseline=baseline,
-        platform=platform
-    )
+    print(f"📈 Baseline={baseline:.3f}")
 
-    print(f"🏆 Reward={reward:.3f}, Baseline={baseline:.3f}")
-
-    # ---------- 9️⃣ RL LEARNING ----------
+    # ---------- 7️⃣ RL LEARNING ----------
     update_rl(
         context=context,
         action=action,
         reward=reward,
-        baseline=baseline, 
+        baseline=baseline,
         ctx_vec=ctx_vec,
         lr_discrete=0.05,
         lr_theta=0.01

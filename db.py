@@ -3,9 +3,19 @@ import os
 import numpy as np
 from dotenv import load_dotenv
 from supabase import create_client
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Load environment variables from .env file
+load_dotenv()
+
+# Reward weights for different time periods (higher weight = more important)
+REWARD_WEIGHTS = {
+    6: 0.1,   # 6 hours - early engagement
+    24: 0.5,  # 24 hours - primary engagement window
+    48: 0.3,  # 48 hours - sustained engagement
+    72: 0.15, # 72 hours - long-term engagement
+    168: 0.05 # 1 week - viral potential
+}
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -152,6 +162,24 @@ def mark_post_as_posted(post_id):
     except Exception as e:
         print(f"Error marking post {post_id} as posted: {e}")
         raise
+
+def create_post_reward_record(profile_id, post_id, platform):
+    """Create initial post reward record when post is published"""
+    try:
+        # Set eligible_at to 24 hours from now (when we can calculate reward)
+        eligible_at = datetime.utcnow() + timedelta(hours=24)
+
+        supabase.table("post_rewards").insert({
+            "profile_id": profile_id,
+            "post_id": post_id,
+            "platform": platform,
+            "reward_status": "pending",
+            "eligible_at": eligible_at.isoformat(),
+            "reward_value": None
+        }).execute()
+    except Exception as e:
+        print(f"Error creating post reward record for {post_id}: {e}")
+        raise
 def insert_action(post_id, platform, context, action):
     try:
         res = supabase.table("rl_actions").insert({
@@ -176,7 +204,7 @@ def insert_action(post_id, platform, context, action):
     except Exception as e:
         print(f"Error inserting action for post_id {post_id}: {e}")
         raise
-def insert_post_snapshot(post_id, platform, metrics):
+def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_hours=24):
     try:
         # Ensure metrics values are properly typed
         processed_metrics = {}
@@ -188,11 +216,17 @@ def insert_post_snapshot(post_id, platform, metrics):
             else:
                 processed_metrics[key] = value  # Keep as-is for strings/other types
 
-        supabase.table("post_snapshots").insert({
+        # Prepare data according to schema
+        snapshot_data = {
+            "profile_id": profile_id or "550e8400-e29b-41d4-a716-446655440000",  # Default business ID
             "post_id": post_id,
             "platform": platform,
+            "timeslot_hours": timeslot_hours,
+            "snapshot_at": datetime.utcnow().isoformat(),
             **processed_metrics
-        }).execute()
+        }
+
+        supabase.table("post_snapshots").insert(snapshot_data).execute()
     except Exception as e:
         print(f"Error inserting post snapshot for post_id {post_id}: {e}")
         raise
@@ -311,4 +345,83 @@ def get_real_platform_metrics(post_id, platform):
     # return call_instagram_api(post_id) or call_twitter_api(post_id)
 
     # Option 3: Return zeros if no data (for very new posts)
-    return {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "replies": 0, "retweets": 0, "reactions": 0, "followers": 0}
+    return {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "replies": 0, "retweets": 0, "reactions": 0, "follower_count": 0}
+
+
+def get_post_reward(profile_id: str, post_id: str, platform: str):
+    res = (
+        supabase.table("post_rewards")
+        .select("*")
+        .eq("profile_id", profile_id)
+        .eq("post_id", post_id)
+        .eq("platform", platform)
+        .single()
+        .execute()
+    )
+    return res.data
+def get_post_snapshots(profile_id: str, post_id: str, platform: str):
+    res = (
+        supabase.table("post_snapshots")
+        .select("timeslot_hours, likes, comments, shares, saves, replies, retweets, reactions")
+        .eq("profile_id", profile_id)
+        .eq("post_id", post_id)
+        .eq("platform", platform)
+        .execute()
+    )
+    return res.data
+def calculate_reward_from_snapshots(snapshots: list) -> float:
+    reward = 0.0
+
+    for snap in snapshots:
+        t = snap["timeslot_hours"]
+        weight = REWARD_WEIGHTS.get(t)
+
+        if not weight:
+            continue
+
+        engagement = (
+            snap.get("likes", 0)
+            + 2 * snap.get("comments", 0)
+            + 2 * snap.get("shares", 0)
+            + snap.get("saves", 0)
+            + snap.get("replies", 0)
+            + snap.get("retweets", 0)
+            + snap.get("reactions", 0)
+        )
+
+        reward += weight * engagement
+
+    return reward
+def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
+    reward_row = get_post_reward(profile_id, post_id, platform)
+
+    # 1️⃣ Already calculated → return immediately
+    if reward_row["reward_status"] == "calculated":
+        return {
+            "status": "calculated",
+            "reward": reward_row["reward_value"]
+        }
+
+    # 2️⃣ Still pending and not eligible
+    if reward_row["reward_status"] == "pending":
+        if datetime.utcnow() < datetime.fromisoformat(reward_row["eligible_at"]):
+            return {
+                "status": "pending",
+                "reward": None
+            }
+
+    # 3️⃣ Eligible → calculate ONCE
+    snapshots = get_post_snapshots(profile_id, post_id, platform)
+
+    reward_value = calculate_reward_from_snapshots(snapshots)
+
+    supabase.table("post_rewards").update({
+        "reward_status": "calculated",
+        "reward_value": reward_value,
+        "calculated_at": datetime.utcnow().isoformat()
+    }).eq("id", reward_row["id"]).execute()
+
+    return {
+        "status": "calculated",
+        "reward": reward_value
+    }
