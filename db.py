@@ -1,5 +1,6 @@
 # db.py
 import os
+import math
 import numpy as np
 from dotenv import load_dotenv
 from supabase import create_client
@@ -16,7 +17,6 @@ REWARD_WEIGHTS = {
     72: 0.15, # 72 hours - long-term engagement
     168: 0.05 # 1 week - viral potential
 }
-load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -64,6 +64,7 @@ def update_preference(platform, time_bucket, day, dimension, value, delta):
 
     Current implementation includes error handling and retry logic as mitigation.
     """
+    print(f"🔄 Updating preference: {platform} | {time_bucket} | Day {day} | {dimension}={value} | delta={delta:.6f}")
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -81,15 +82,18 @@ def update_preference(platform, time_bucket, day, dimension, value, delta):
                 if "id" in row and "preference_score" in row and "num_samples" in row:
                     current_score = float(row["preference_score"])
                     current_samples = int(row["num_samples"])
+                    new_score = current_score + delta
 
+                    print(f"   📊 Existing preference: {current_score:.4f} → {new_score:.4f} (samples: {current_samples} → {current_samples + 1})")
                     supabase.table("rl_preferences").update({
-                        "preference_score": current_score + delta,
+                        "preference_score": new_score,
                         "num_samples": current_samples + 1,
                         "updated_at": datetime.utcnow().isoformat()
                     }).eq("id", row["id"]).execute()
                     return  # Success
             else:
                 # Insert new preference - use upsert for safety
+                print(f"   🆕 Creating new preference entry with score: {delta:.4f}")
                 try:
                     supabase.table("rl_preferences").upsert({
                         "platform": platform,
@@ -163,20 +167,29 @@ def mark_post_as_posted(post_id):
         print(f"Error marking post {post_id} as posted: {e}")
         raise
 
-def create_post_reward_record(profile_id, post_id, platform):
+def create_post_reward_record(profile_id, post_id, platform, action_id=None):
     """Create initial post reward record when post is published"""
     try:
-        # Set eligible_at to 24 hours from now (when we can calculate reward)
-        eligible_at = datetime.utcnow() + timedelta(hours=24)
+        # Set post_created_at to now and eligible_at to 24 hours from now
+        post_created_at = datetime.utcnow()
+        eligible_at = post_created_at + timedelta(hours=24)
 
-        supabase.table("post_rewards").insert({
+        reward_data = {
             "profile_id": profile_id,
             "post_id": post_id,
             "platform": platform,
             "reward_status": "pending",
+            "post_created_at": post_created_at.isoformat(),
             "eligible_at": eligible_at.isoformat(),
             "reward_value": None
-        }).execute()
+        }
+
+        # TODO: Add action_id when column is available in schema
+        # For now, action_id will be found from post_contents during reward calculation
+        # if action_id:
+        #     reward_data["action_id"] = action_id
+
+        supabase.table("post_rewards").insert(reward_data).execute()
     except Exception as e:
         print(f"Error creating post reward record for {post_id}: {e}")
         raise
@@ -218,7 +231,7 @@ def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_h
 
         # Prepare data according to schema
         snapshot_data = {
-            "profile_id": profile_id or "550e8400-e29b-41d4-a716-446655440000",  # Default business ID
+            "profile_id": profile_id or "7648103e-81be-4fd9-b573-8e72e2fcbe5d",  # Default business ID
             "post_id": post_id,
             "platform": platform,
             "timeslot_hours": timeslot_hours,
@@ -249,6 +262,7 @@ def insert_reward(action_id, reward, baseline, platform):
         print(f"Error inserting reward for action_id {action_id}: {e}")
         raise
 def update_and_get_baseline(platform, reward, alpha=0.1):
+    print(f"📊 Updating baseline for {platform}: current reward={reward:.4f}, alpha={alpha}")
     try:
         res = supabase.table("rl_baselines") \
             .select("value") \
@@ -259,6 +273,7 @@ def update_and_get_baseline(platform, reward, alpha=0.1):
             baseline = float(res.data[0]["value"])
             new_baseline = baseline + alpha * (reward - baseline)
 
+            print(f"   📈 Baseline updated: {baseline:.4f} → {new_baseline:.4f}")
             supabase.table("rl_baselines").update({
                 "value": new_baseline,
                 "updated_at": datetime.utcnow().isoformat()
@@ -267,6 +282,7 @@ def update_and_get_baseline(platform, reward, alpha=0.1):
             return new_baseline
         else:
             # Insert new baseline
+            print(f"   🆕 Creating new baseline: {reward:.4f}")
             supabase.table("rl_baselines").insert({
                 "platform": platform,
                 "value": reward
@@ -282,19 +298,29 @@ def get_profile_embedding(profile_id):
             .select("profile_embedding") \
             .eq("id", profile_id) \
             .execute()
-        
+
         if res.data and len(res.data) > 0:
             row = res.data[0]
             if "profile_embedding" in row and row["profile_embedding"] is not None:
-                # profile_embedding should be returned as a list/array from Supabase
+                # profile_embedding can be returned as a list/array or string from Supabase
                 embedding_data = row["profile_embedding"]
-                
+
                 if isinstance(embedding_data, list):
                     return np.array(embedding_data, dtype=np.float32)
+                elif isinstance(embedding_data, str):
+                    # Parse string representation of vector (e.g., "[1.0, 2.0, 3.0]" or "1.0,2.0,3.0")
+                    try:
+                        # Remove brackets if present and split by comma
+                        cleaned_str = embedding_data.strip('[]')
+                        values = [float(x.strip()) for x in cleaned_str.split(',')]
+                        return np.array(values, dtype=np.float32)
+                    except (ValueError, AttributeError) as parse_error:
+                        print(f"Error parsing embedding string: {parse_error}")
+                        return None
                 else:
                     print(f"Unexpected embedding format: {type(embedding_data)}")
                     return None
-        
+
         return None
     except Exception as e:
         print(f"Error retrieving profile embedding for {profile_id}: {e}")
@@ -349,16 +375,20 @@ def get_real_platform_metrics(post_id, platform):
 
 
 def get_post_reward(profile_id: str, post_id: str, platform: str):
-    res = (
-        supabase.table("post_rewards")
-        .select("*")
-        .eq("profile_id", profile_id)
-        .eq("post_id", post_id)
-        .eq("platform", platform)
-        .single()
-        .execute()
-    )
-    return res.data
+    try:
+        res = (
+            supabase.table("post_rewards")
+            .select("*")
+            .eq("profile_id", profile_id)
+            .eq("post_id", post_id)
+            .eq("platform", platform)
+            .single()
+            .execute()
+        )
+        return res.data
+    except Exception as e:
+        print(f"Error fetching reward record: {e}")
+        return None
 def get_post_snapshots(profile_id: str, post_id: str, platform: str):
     res = (
         supabase.table("post_snapshots")
@@ -369,8 +399,9 @@ def get_post_snapshots(profile_id: str, post_id: str, platform: str):
         .execute()
     )
     return res.data
-def calculate_reward_from_snapshots(snapshots: list) -> float:
+def calculate_reward_from_snapshots(snapshots: list, platform: str) -> float:
     reward = 0.0
+    print(f"🔢 Calculating reward for {platform} with {len(snapshots)} snapshots")
 
     for snap in snapshots:
         t = snap["timeslot_hours"]
@@ -379,47 +410,160 @@ def calculate_reward_from_snapshots(snapshots: list) -> float:
         if not weight:
             continue
 
-        engagement = (
-            snap.get("likes", 0)
-            + 2 * snap.get("comments", 0)
-            + 2 * snap.get("shares", 0)
-            + snap.get("saves", 0)
-            + snap.get("replies", 0)
-            + snap.get("retweets", 0)
-            + snap.get("reactions", 0)
-        )
+        # Platform-specific engagement calculation
+        if platform == "instagram":
+            # Instagram values SAVES the most
+            engagement = (
+                3.0 * snap.get("saves", 0) +
+                2.0 * snap.get("shares", 0) +
+                1.0 * snap.get("comments", 0) +
+                0.3 * snap.get("likes", 0)
+            )
+        elif platform == "x":
+            # X values REPLIES the most
+            engagement = (
+                3.0 * snap.get("replies", 0) +
+                2.0 * snap.get("retweets", 0) +
+                1.0 * snap.get("likes", 0)
+            )
+        elif platform == "linkedin":
+            # LinkedIn values COMMENTS + SHARES
+            engagement = (
+                3.0 * snap.get("comments", 0) +
+                2.0 * snap.get("shares", 0) +
+                1.0 * snap.get("likes", 0)
+            )
+        elif platform == "facebook":
+            # Facebook values COMMENTS + SHARES
+            engagement = (
+                3.0 * snap.get("comments", 0) +
+                2.0 * snap.get("shares", 0) +
+                1.0 * snap.get("reactions", 0)
+            )
+        else:
+            raise ValueError(f"Unsupported platform: {platform}")
 
-        reward += weight * engagement
+        # Apply time-based weighting
+        weighted_engagement = weight * engagement
+        reward += weighted_engagement
+        print(f"   📊 {t}h snapshot: {engagement:.2f} engagement × {weight} weight = {weighted_engagement:.4f}")
 
-    return reward
+    # Apply normalization (same as rl_agent.py compute_reward)
+    followers = max(snapshots[0].get("follower_count", 1), 1) if snapshots else 1
+    raw_score = math.log(1 + reward) / math.log(1 + followers)
+    final_reward = math.tanh(raw_score)
+
+    print(f"   📈 Total reward: {reward:.4f}, Followers: {followers}, Raw score: {raw_score:.4f}, Final reward: {final_reward:.4f}")
+
+    return final_reward
 def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
+    print(f"🎯 Fetching/calculating reward for post {post_id} on {platform}")
     reward_row = get_post_reward(profile_id, post_id, platform)
 
-    # 1️⃣ Already calculated → return immediately
-    if reward_row["reward_status"] == "calculated":
+    # Handle case where reward record doesn't exist yet
+    if reward_row is None:
+        print(f"   📝 Reward record doesn't exist yet for {post_id}")
         return {
-            "status": "calculated",
-            "reward": reward_row["reward_value"]
+            "status": "pending",
+            "reward": None
         }
 
-    # 2️⃣ Still pending and not eligible
-    if reward_row["reward_status"] == "pending":
-        if datetime.utcnow() < datetime.fromisoformat(reward_row["eligible_at"]):
-            return {
-                "status": "pending",
-                "reward": None
-            }
+    # 1️⃣ Already calculated → return immediately
+    if reward_row.get("reward_status") == "calculated":
+        existing_reward = reward_row.get("reward_value")
+        print(f"   ✅ Reward already calculated: {existing_reward}")
+        return {
+            "status": "calculated",
+            "reward": existing_reward
+        }
 
-    # 3️⃣ Eligible → calculate ONCE
+    # 2️⃣ Check eligibility status (handle multiple valid states)
+    status = reward_row.get("reward_status", "pending")
+    if status == "pending":
+        eligible_at = reward_row.get("eligible_at")
+        if eligible_at:
+            # Handle timezone-aware vs timezone-naive datetime comparison
+            try:
+                # Parse the eligible_at datetime and make it timezone-naive for comparison
+                if eligible_at.endswith('Z'):
+                    eligible_dt = datetime.fromisoformat(eligible_at[:-1])
+                else:
+                    eligible_dt = datetime.fromisoformat(eligible_at)
+                # If it's timezone-aware, convert to naive UTC
+                if eligible_dt.tzinfo is not None:
+                    eligible_dt = eligible_dt.replace(tzinfo=None)
+
+                current_dt = datetime.utcnow()
+                if current_dt < eligible_dt:
+                    print(f"   ⏳ Reward not yet eligible (eligible at: {eligible_at})")
+                    return {
+                        "status": "pending",
+                        "reward": None
+                    }
+            except (ValueError, AttributeError) as e:
+                # If parsing fails, assume it's not eligible
+                print(f"   ⏳ Could not parse eligible_at: {eligible_at} (error: {e})")
+                return {
+                    "status": "pending",
+                    "reward": None
+                }
+
+    # 3️⃣ Eligible or eligible status → calculate ONCE
+    print(f"   🔄 Calculating reward (status: {status})")
     snapshots = get_post_snapshots(profile_id, post_id, platform)
 
-    reward_value = calculate_reward_from_snapshots(snapshots)
+    if not snapshots:
+        # No snapshots available yet
+        print(f"   📊 No snapshots available yet for {post_id}")
+        return {
+            "status": "pending",
+            "reward": None
+        }
 
-    supabase.table("post_rewards").update({
-        "reward_status": "calculated",
-        "reward_value": reward_value,
-        "calculated_at": datetime.utcnow().isoformat()
-    }).eq("id", reward_row["id"]).execute()
+    reward_value = calculate_reward_from_snapshots(snapshots, platform)
+
+    try:
+        print(f"   💾 Updating reward record with calculated value: {reward_value}")
+        supabase.table("post_rewards").update({
+            "reward_status": "calculated",
+            "reward_value": reward_value,
+            "calculated_at": datetime.utcnow().isoformat()
+        }).eq("id", reward_row["id"]).execute()
+
+        # Also store final reward in rl_rewards table
+        print(f"   📊 Storing reward in rl_rewards table")
+        action_id = reward_row.get("action_id")
+
+        # If action_id not in reward record, try to find it from post_contents
+        if not action_id:
+            try:
+                post_content = supabase.table("post_contents").select("action_id").eq("post_id", reward_row["post_id"]).eq("platform", platform).execute()
+                if post_content.data and len(post_content.data) > 0:
+                    action_id = post_content.data[0].get("action_id")
+                    print(f"   🔗 Found action_id from post_contents: {action_id}")
+            except Exception as e:
+                print(f"   ⚠️  Could not find action_id: {e}")
+
+        if not action_id:
+            print(f"   ⚠️  Warning: No action_id found, skipping rl_rewards insert")
+        else:
+            supabase.table("rl_rewards").insert({
+                "action_id": action_id,  # Link to rl_actions record
+                "platform": platform,
+                "reward_value": reward_value,
+                "baseline": 0.0,  # Will be updated by baseline calculation
+                "deleted": False,
+                "days_to_delete": None,
+                "reward_window": "24h"
+            }).execute()
+        print(f"   ✅ Reward calculation completed successfully")
+
+    except Exception as e:
+        print(f"Error updating reward: {e}")
+        return {
+            "status": "error",
+            "reward": None
+        }
 
     return {
         "status": "calculated",

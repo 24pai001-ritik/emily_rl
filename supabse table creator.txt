@@ -115,49 +115,6 @@ create table public.post_snapshots (
 );
 
 
-create table post_rewards (
-  id uuid primary key default gen_random_uuid(),
-
-  profile_id uuid not null
-    references public.profiles (id)
-    on delete cascade,
-
-  post_id text not null,
-  platform text not null,
-
-  reward_status text not null default 'pending'
-    check (reward_status in ('pending', 'calculated')),
-
-  eligible_at timestamp with time zone not null,
-  calculated_at timestamp with time zone,
-
-  reward_value float,
-
-  created_at timestamp with time zone default now(),
-
-  -- prevent duplicate rewards
-  constraint unique_post_reward
-    unique (profile_id, post_id, platform)
-);
-
-create table rl_baselines (
-  id uuid primary key default gen_random_uuid(),
-
-  platform text not null unique,
-  value float default 0.0,
-
-  updated_at timestamp with time zone default now()
-);
-
-create table profiles (
-  id uuid primary key default gen_random_uuid(),
-
-  profile_embedding jsonb,
-
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
-);
-
 create table rl_preferences (
   id uuid primary key default gen_random_uuid(),
 
@@ -183,3 +140,331 @@ create table rl_preferences (
     action_value
   )
 );
+create table public.post_rewards (
+  id uuid primary key default gen_random_uuid(),
+
+  profile_id uuid not null
+    references public.profiles (id)
+    on delete cascade,
+
+  post_id text not null,
+  platform text not null,
+
+  -- reward lifecycle
+  reward_status text not null default 'pending',
+  -- pending | eligible | calculated
+
+  reward_value float null,
+
+  -- timestamps
+  post_created_at timestamp with time zone not null,
+  eligible_at timestamp with time zone not null, -- post_created_at + 7 days
+  calculated_at timestamp with time zone null,
+
+  created_at timestamp with time zone default now(),
+
+  constraint unique_post_reward
+    unique (profile_id, post_id, platform)
+);
+create table public.post_snapshots (
+  id uuid primary key default gen_random_uuid(),
+
+  -- ownership
+  profile_id uuid not null
+    references public.profiles (id)
+    on delete cascade,
+
+  post_id text not null,
+  platform text not null,
+
+  -- snapshot identity
+  timeslot_hours int not null, 
+  -- allowed values: 6, 24, 48, 72, 168
+
+  snapshot_at timestamp with time zone not null,
+
+  -- engagement metrics (post-level)
+  likes int default 0,
+  comments int default 0,
+  shares int default 0,
+  saves int default 0,
+  replies int default 0,
+  retweets int default 0,
+  reactions int default 0,
+
+  -- account context at snapshot time
+  follower_count int default 0,
+
+  created_at timestamp with time zone default now(),
+
+  -- prevent duplicate snapshots
+  constraint unique_post_snapshot
+    unique (profile_id, post_id, platform, timeslot_hours)
+);
+create table public.profiles (
+  id uuid not null,
+  name text null,
+  avatar_url text null,
+  onboarding_completed boolean null default false,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  business_name text null,
+  business_type text[] null,
+  industry text[] null,
+  business_description text null,
+  target_audience text[] null,
+  unique_value_proposition text null,
+  brand_voice text null,
+  brand_tone text null,
+  website_url text null,
+  phone_number text null,
+  street_address text null,
+  city text null,
+  state text null,
+  country text null,
+  timezone text null,
+  social_media_platforms text[] null,
+  primary_goals text[] null,
+  key_metrics_to_track text[] null,
+  monthly_budget_range text null,
+  posting_frequency text null,
+  preferred_content_types text[] null,
+  content_themes text[] null,
+  main_competitors text null,
+  market_position text null,
+  products_or_services text null,
+  important_launch_dates text null,
+  planned_promotions_or_campaigns text null,
+  top_performing_content_types text[] null,
+  best_time_to_post text[] null,
+  successful_campaigns text null,
+  hashtags_that_work_well text null,
+  customer_pain_points text null,
+  typical_customer_journey text null,
+  automation_level text null,
+  platform_specific_tone jsonb null,
+  current_presence text[] null,
+  focus_areas text[] null,
+  platform_details jsonb null,
+  facebook_page_name text null,
+  instagram_profile_link text null,
+  linkedin_company_link text null,
+  youtube_channel_link text null,
+  x_twitter_profile text null,
+  google_business_profile text null,
+  google_ads_account text null,
+  whatsapp_business text null,
+  email_marketing_platform text null,
+  target_audience_age_groups text[] null,
+  target_audience_life_stages text[] null,
+  target_audience_professional_types text[] null,
+  target_audience_lifestyle_interests text[] null,
+  target_audience_buyer_behavior text[] null,
+  target_audience_other text null,
+  platform_tone_instagram text[] null,
+  platform_tone_facebook text[] null,
+  platform_tone_linkedin text[] null,
+  platform_tone_youtube text[] null,
+  platform_tone_x text[] null,
+  business_type_other text null,
+  industry_other text null,
+  social_platform_other text null,
+  goal_other text null,
+  metric_other text null,
+  content_type_other text null,
+  content_theme_other text null,
+  posting_time_other text null,
+  current_presence_other text null,
+  top_performing_content_type_other text null,
+  meta_ads_facebook boolean null default false,
+  meta_ads_instagram boolean null default false,
+  logo_url text null,
+  subscription_status character varying(20) null default 'inactive'::character varying,
+  subscription_plan character varying(20) null default null::character varying,
+  subscription_start_date timestamp without time zone null,
+  subscription_end_date timestamp without time zone null,
+  razorpay_subscription_id character varying(255) null default null::character varying,
+  razorpay_customer_id character varying(255) null default null::character varying,
+  migration_status character varying(20) null default 'pending'::character varying,
+  grace_period_end timestamp without time zone null,
+  trial_activated_at timestamp without time zone null,
+  trial_expires_at timestamp without time zone null,
+  has_had_trial boolean null default false,
+  primary_color text null,
+  secondary_color text null,
+  additional_colors jsonb null default '[]'::jsonb,
+  successful_content_url text null,
+  target_audience_age_min integer null,
+  target_audience_age_max integer null,
+  target_audience_gender text null,
+  successful_content_urls text[] null,
+  profile_embedding public.vector null,
+  embedding_updated_at timestamp with time zone null,
+  embedding_needs_update boolean null default false,
+  onboarding_type text null default 'business'::text,
+  creator_name text null,
+  creator_type text null,
+  primary_niche text null,
+  profile_photo_url text null,
+  brand_colors text[] null,
+  location_city text null,
+  location_state text null,
+  location_country text null,
+  creator_bio text null,
+  audience_lifestyle_interests text[] null,
+  audience_behavior text[] null,
+  active_platforms text[] null,
+  current_online_presence_status text null,
+  best_performing_content_urls text[] null,
+  competitors text null,
+  biggest_challenges text[] null,
+  monetization_sources text[] null,
+  constraint profiles_pkey primary key (id),
+  constraint profiles_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE,
+  constraint profiles_target_audience_gender_check check (
+    (
+      target_audience_gender = any (array['all'::text, 'men'::text, 'women'::text])
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_trial_expires_at on public.profiles using btree (trial_expires_at) TABLESPACE pg_default
+where
+  ((subscription_status)::text = 'trial'::text);
+
+create index IF not exists idx_profiles_onboarding_completed on public.profiles using btree (onboarding_completed) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_business_name on public.profiles using btree (business_name) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_created_at on public.profiles using btree (created_at) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_has_had_trial on public.profiles using btree (has_had_trial) TABLESPACE pg_default
+where
+  (has_had_trial = true);
+
+create index IF not exists idx_profiles_timezone on public.profiles using btree (timezone) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_logo_url on public.profiles using btree (logo_url) TABLESPACE pg_default
+where
+  (logo_url is not null);
+
+create index IF not exists idx_profiles_subscription_status on public.profiles using btree (subscription_status) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_subscription_plan on public.profiles using btree (subscription_plan) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_migration_status on public.profiles using btree (migration_status) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_age_range on public.profiles using btree (target_audience_age_min, target_audience_age_max) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_gender on public.profiles using btree (target_audience_gender) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_embedding_needs_update on public.profiles using btree (embedding_needs_update) TABLESPACE pg_default
+where
+  (embedding_needs_update = true);
+
+create index IF not exists idx_profiles_embedding_updated_at on public.profiles using btree (embedding_updated_at) TABLESPACE pg_default;
+
+create index IF not exists idx_profiles_onboarding_type on public.profiles using btree (onboarding_type) TABLESPACE pg_default;
+
+create trigger trigger_set_embedding_needs_update BEFORE INSERT
+or
+update on profiles for EACH row
+execute FUNCTION set_embedding_needs_update ();
+
+create trigger update_profiles_updated_at BEFORE
+update on profiles for EACH row
+execute FUNCTION update_updated_at_column ();
+create table public.platform_connections (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid null,
+  platform character varying(50) not null,
+  page_id character varying(100) null,
+  page_name character varying(255) null,
+  page_username character varying(100) null,
+  follower_count integer null default 0,
+  access_token_encrypted text null,
+  refresh_token_encrypted text null,
+  token_expires_at timestamp without time zone null,
+  is_active boolean null default true,
+  last_sync timestamp without time zone null,
+  last_posted_at timestamp without time zone null,
+  connection_status character varying(20) null default 'active'::character varying,
+  connected_at timestamp without time zone null default now(),
+  last_token_refresh timestamp without time zone null,
+  disconnected_at timestamp without time zone null,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  linkedin_id character varying(100) null,
+  headline text null,
+  email character varying(255) null,
+  profile_picture text null,
+  organization_id character varying(100) null,
+  account_type character varying(50) null default 'personal'::character varying,
+  is_organization boolean null default false,
+  token_source character varying(20) null default 'oauth'::character varying,
+  google_email character varying(255) null,
+  google_drive_quota bigint null,
+  google_docs_count integer null default 0,
+  google_sheets_count integer null default 0,
+  google_calendar_enabled boolean null default false,
+  youtube_channel_id character varying(100) null,
+  youtube_channel_title character varying(255) null,
+  youtube_subscriber_count bigint null default 0,
+  youtube_custom_url character varying(255) null,
+  youtube_thumbnail_url text null,
+  wordpress_site_url text null,
+  wordpress_username character varying(255) null,
+  wordpress_app_password_encrypted text null,
+  wordpress_site_name character varying(255) null,
+  wordpress_user_id bigint null,
+  wordpress_user_email character varying(255) null,
+  wordpress_user_display_name character varying(255) null,
+  wordpress_capabilities jsonb null,
+  wordpress_version character varying(50) null,
+  wordpress_last_checked_at timestamp without time zone null,
+  wordpress_metadata jsonb null,
+  constraint platform_connections_pkey primary key (id),
+  constraint platform_connections_user_id_platform_page_id_key unique (user_id, platform, page_id),
+  constraint platform_connections_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint check_wordpress_required_fields check (
+    (
+      ((platform)::text <> 'wordpress'::text)
+      or (
+        ((platform)::text = 'wordpress'::text)
+        and (wordpress_site_url is not null)
+        and (wordpress_username is not null)
+        and (wordpress_app_password_encrypted is not null)
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_user_id on public.platform_connections using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_platform on public.platform_connections using btree (platform) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_status on public.platform_connections using btree (connection_status) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_active on public.platform_connections using btree (is_active) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_organization_id on public.platform_connections using btree (organization_id) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_account_type on public.platform_connections using btree (account_type) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_is_organization on public.platform_connections using btree (is_organization) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_connections_google on public.platform_connections using btree (platform, is_active) TABLESPACE pg_default
+where
+  ((platform)::text = 'google'::text);
+
+create index IF not exists idx_platform_connections_wordpress_site_url on public.platform_connections using btree (wordpress_site_url) TABLESPACE pg_default
+where
+  (wordpress_site_url is not null);
+
+create index IF not exists idx_platform_connections_wordpress_username on public.platform_connections using btree (wordpress_username) TABLESPACE pg_default
+where
+  (wordpress_username is not null);
+
+create index IF not exists idx_platform_connections_wordpress_user_id on public.platform_connections using btree (wordpress_user_id) TABLESPACE pg_default
+where
+  (wordpress_user_id is not null);

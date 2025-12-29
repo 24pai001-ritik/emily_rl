@@ -92,10 +92,12 @@ def select_action(context):
 
 def update_rl(context, action, ctx_vec, reward, baseline,
               lr_discrete=0.05, lr_theta=0.01):
+    print(f"🧠 Updating RL: reward={reward:.4f}, baseline={baseline:.4f}, advantage={reward - baseline:.4f}")
     ctx_vec = build_context_vector(context)
     advantage = reward - baseline
- 
+
     for dim, val in action.items():
+        print(f"   🎯 Updating action dimension: {dim}={val}")
 
         # 1️⃣ Discrete update (Supabase)
         db.update_preference(
@@ -108,7 +110,9 @@ def update_rl(context, action, ctx_vec, reward, baseline,
         )
 
         # 2️⃣ Continuous update (theta)
-        theta[(dim, val)] += lr_theta * advantage * ctx_vec
+        theta_update = lr_theta * advantage * ctx_vec
+        theta[(dim, val)] += theta_update
+        print(f"   📈 Theta update magnitude: {np.linalg.norm(theta_update):.6f}")
 
 #---Computing Reward---
 

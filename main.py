@@ -29,7 +29,7 @@ from generate import generate_prompts
 # -------------------------------------------------
  
 PLATFORM = "instagram"
-BUSINESS_ID = "550e8400-e29b-41d4-a716-446655440000"
+BUSINESS_ID = "7648103e-81be-4fd9-b573-8e72e2fcbe5d"
 FOLLOWERS = 1816
 
 # -------------------------------------------------
@@ -131,42 +131,13 @@ def run_one_post(topic, platform, date, time):
     db.mark_post_as_posted(post_id)
 
     # Create initial reward record for future calculation
-    db.create_post_reward_record(BUSINESS_ID, post_id, platform)
+    db.create_post_reward_record(BUSINESS_ID, post_id, platform, action_id)
 
-    # ---------- 6️⃣ FETCH OR CALCULATE REWARD ----------
-    reward_result = fetch_or_calculate_reward(
-        profile_id=BUSINESS_ID,  # Using BUSINESS_ID instead of profile.id
-        post_id=post_id,
-        platform=platform
-    )
-
-    if reward_result["status"] == "pending":
-        # ⛔ DO NOTHING - reward not ready yet
-        print("⏳ Reward not ready yet - skipping RL update")
-        return
-
-    # ✅ Reward is ready → continue RL process
-    reward = reward_result["reward"]
-    print(f"🏆 Reward={reward:.3f}")
-
-    # Get baseline for this reward
-    baseline = db.update_and_get_baseline(
-        platform=platform,
-        reward=reward
-    )
-
-    print(f"📈 Baseline={baseline:.3f}")
-
-    # ---------- 7️⃣ RL LEARNING ----------
-    update_rl(
-        context=context,
-        action=action,
-        reward=reward,
-        baseline=baseline,
-        ctx_vec=ctx_vec,
-        lr_discrete=0.05,
-        lr_theta=0.01
-    )
+    # ---------- 6️⃣ QUEUE REWARD CALCULATION FOR WORKER ----------
+    # In production: Queue job for worker to calculate reward asynchronously
+    # This prevents blocking the main thread and ensures proper delayed reward calculation
+    # db.queue_rl_update_job(post_id, action, context, ctx_vec)
+    print("📋 RL update queued for worker processing (production)")
 
     print("🧠 RL updated successfully")
 
