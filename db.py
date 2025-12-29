@@ -165,7 +165,7 @@ def insert_action(post_id, platform, context, action):
         if res.data and len(res.data) > 0 and "id" in res.data[0]:
             return res.data[0]["id"]
         else:
-            raise ValueError("Failed to insert action - no ID returned")
+            raise ValueError("Failed to insert action - no ID returned")    
     except Exception as e:
         print(f"Error inserting action for post_id {post_id}: {e}")
         raise
@@ -259,10 +259,66 @@ def get_profile_embedding(profile_id):
 def get_profile_embedding_with_fallback(profile_id):
     """Get profile embedding with fallback to random"""
     embedding = get_profile_embedding(profile_id)
-    
+
     if embedding is not None:
         return embedding
-    
+
     # Fallback to random embedding if not found in database
     print(f"Profile embedding not found for {profile_id}, using random embedding")
     return np.random.rand(384).astype("float32")
+
+
+def get_post_metrics(post_id, platform):
+    """Fetch real metrics for a post from database"""
+    try:
+        res = supabase.table("post_snapshots") \
+            .select("*") \
+            .eq("post_id", post_id) \
+            .eq("platform", platform) \
+            .execute()
+
+        if res.data and len(res.data) > 0:
+            # Return the metrics dict, excluding metadata fields
+            row = res.data[0]
+            metrics = {k: v for k, v in row.items()
+                      if k not in ['post_id', 'platform', 'created_at', 'id']}
+            return metrics
+        return None
+    except Exception as e:
+        print(f"Error fetching metrics for post {post_id}: {e}")
+        return None
+
+
+def get_post_metrics(post_id, platform):
+    """Fetch real metrics for a post from database"""
+    try:
+        res = supabase.table("post_snapshots") \
+            .select("*") \
+            .eq("post_id", post_id) \
+            .eq("platform", platform) \
+            .execute()
+
+        if res.data and len(res.data) > 0:
+            # Return the metrics dict, excluding metadata fields
+            row = res.data[0]
+            metrics = {k: v for k, v in row.items()
+                      if k not in ['post_id', 'platform', 'created_at', 'id']}
+            return metrics
+        return None
+    except Exception as e:
+        print(f"Error fetching metrics for post {post_id}: {e}")
+        return None
+
+
+def get_real_platform_metrics(post_id, platform):
+    """Get real metrics from database or API"""
+    # Option 1: Fetch from your database
+    metrics = get_post_metrics(post_id, platform)
+    if metrics:
+        return metrics
+
+    # Option 2: Call social media API if not in DB yet
+    # return call_instagram_api(post_id) or call_twitter_api(post_id)
+
+    # Option 3: Return zeros if no data (for very new posts)
+    return {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "replies": 0, "retweets": 0, "reactions": 0, "followers": 0}

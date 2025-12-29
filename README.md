@@ -49,8 +49,118 @@ pip install -r requirements.txt
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env
+cp env.example .env
 # Edit .env with your Supabase credentials
+```
+
+4. Configure your Supabase database with the required tables (see Database Schema section below).
+
+## Database Schema
+
+Create these tables in your Supabase database:
+
+### Required Tables
+
+#### `rl_preferences`
+```sql
+CREATE TABLE rl_preferences (
+  id SERIAL PRIMARY KEY,
+  platform TEXT NOT NULL,
+  time_bucket TEXT NOT NULL,
+  day_of_week INTEGER NOT NULL,
+  dimension TEXT NOT NULL,
+  action_value TEXT NOT NULL,
+  preference_score FLOAT DEFAULT 0.0,
+  num_samples INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(platform, time_bucket, day_of_week, dimension, action_value)
+);
+```
+
+#### `post_contents`
+```sql
+CREATE TABLE post_contents (
+  id SERIAL PRIMARY KEY,
+  post_id TEXT NOT NULL UNIQUE,
+  action_id INTEGER,
+  platform TEXT NOT NULL,
+  business_id TEXT NOT NULL,
+  topic TEXT,
+  post_type TEXT,
+  business_context TEXT,
+  business_aesthetic TEXT,
+  image_prompt TEXT,
+  caption_prompt TEXT,
+  generated_caption TEXT,
+  generated_image_url TEXT,
+  status TEXT DEFAULT 'generated',
+  created_at TIMESTAMP DEFAULT NOW(),
+  posted_at TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `rl_actions`
+```sql
+CREATE TABLE rl_actions (
+  id SERIAL PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  time_bucket TEXT,
+  day_of_week INTEGER,
+  action JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `post_snapshots`
+```sql
+CREATE TABLE post_snapshots (
+  id SERIAL PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  likes INTEGER DEFAULT 0,
+  comments INTEGER DEFAULT 0,
+  shares INTEGER DEFAULT 0,
+  saves INTEGER DEFAULT 0,
+  replies INTEGER DEFAULT 0,
+  retweets INTEGER DEFAULT 0,
+  reactions INTEGER DEFAULT 0,
+  followers INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `rl_rewards`
+```sql
+CREATE TABLE rl_rewards (
+  id SERIAL PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  reward FLOAT,
+  baseline FLOAT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `rl_baselines`
+```sql
+CREATE TABLE rl_baselines (
+  id SERIAL PRIMARY KEY,
+  platform TEXT NOT NULL UNIQUE,
+  value FLOAT DEFAULT 0.0,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `profiles`
+```sql
+CREATE TABLE profiles (
+  id TEXT PRIMARY KEY,
+  profile_embedding JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 ```
 
 4. Configure your Supabase database with the required tables.
