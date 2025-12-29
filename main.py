@@ -112,13 +112,12 @@ def run_one_post(topic, platform, date, time):
     print("🎯 RL Action:", action)
 
     # ---------- 5️⃣ SIMULATE POSTING ----------
-    print("📤 Simulating post publish...")
-    time.sleep(1)
+   
 
     db.mark_post_as_posted(post_id)
 
     # ---------- 6️⃣ COLLECT METRICS ----------
-    metrics = simulate_platform_metrics()
+    metrics = db.get_real_platform_metrics(post_id, platform)
     print("📊 Metrics:", metrics)
 
     # ---------- 7️⃣ STORE SNAPSHOT ----------
@@ -143,9 +142,10 @@ def run_one_post(topic, platform, date, time):
     )
 
     db.insert_reward(
-        post_id=post_id,
+        action_id=action_id,  # Changed from post_id to action_id
         reward=reward,
-        baseline=baseline
+        baseline=baseline,
+        platform=platform
     )
 
     print(f"🏆 Reward={reward:.3f}, Baseline={baseline:.3f}")

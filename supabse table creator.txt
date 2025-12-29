@@ -1,0 +1,142 @@
+# supabse table creator 
+create table post_contents (
+  id uuid primary key default gen_random_uuid(),
+
+  -- linkage
+  post_id text not null,
+  action_id uuid references rl_actions(id) on delete cascade,
+
+  platform text not null,
+  business_id uuid,
+
+  -- content context
+  topic text,
+  post_type text,
+  business_context text,
+  business_aesthetic text,
+
+  -- prompts (VERY IMPORTANT)
+  image_prompt text,
+  caption_prompt text,
+
+  -- generated outputs
+  generated_caption text,
+  generated_image_url text,
+
+  -- lifecycle
+  status text default 'generated', 
+  -- generated | posted | failed | deleted
+
+  posted_at timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
+create table rl_actions (
+  id uuid primary key default gen_random_uuid(),
+
+  post_id text,
+  platform text not null,
+
+  -- hierarchical actions
+  hook_type text,
+  hook_length text,
+  tone text,
+  creativity text,
+  text_in_image text,
+  visual_style text,
+
+  -- context (observed, not action)
+  time_bucket text,
+  day_of_week int,
+
+  topic text,
+  business_id uuid,
+
+  created_at timestamp with time zone default now()
+);
+
+
+
+
+create table rl_rewards (
+  id uuid primary key default gen_random_uuid(),
+
+  action_id uuid references rl_actions(id) on delete cascade,
+
+  platform text,
+
+  reward_value float,
+  baseline float,
+
+  deleted boolean default false,
+  days_to_delete int,
+
+  reward_window text, -- "24h"
+
+  created_at timestamp with time zone default now()
+);
+
+
+
+create table post_snapshots (
+  id uuid primary key default gen_random_uuid(),
+
+  post_id text not null,
+  platform text not null,
+
+  -- engagement metrics
+  likes int default 0,
+  comments int default 0,
+  shares int default 0,
+  saves int default 0,
+  replies int default 0,
+  retweets int default 0,
+  reactions int default 0,
+  followers int default 0,
+
+  created_at timestamp with time zone default now()
+);
+
+create table rl_baselines (
+  id uuid primary key default gen_random_uuid(),
+
+  platform text not null unique,
+  value float default 0.0,
+
+  updated_at timestamp with time zone default now()
+);
+
+create table profiles (
+  id uuid primary key default gen_random_uuid(),
+
+  profile_embedding jsonb,
+
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+create table rl_preferences (
+  id uuid primary key default gen_random_uuid(),
+
+  -- context
+  platform text,
+  time_bucket text,
+  day_of_week int,
+
+  -- action dimension
+  dimension text,       -- hook_type, tone, hook_length_pair
+  action_value text,    -- question, casual, question_short
+
+  preference_score float default 0,
+  num_samples int default 0,
+
+  updated_at timestamp with time zone default now(),
+
+  unique (
+    platform,
+    time_bucket,
+    day_of_week,
+    dimension,
+    action_value
+  )
+);

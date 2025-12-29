@@ -157,15 +157,22 @@ def insert_action(post_id, platform, context, action):
         res = supabase.table("rl_actions").insert({
             "post_id": post_id,
             "platform": platform,
+            "hook_type": action.get("HOOK_TYPE"),
+            "hook_length": action.get("LENGTH"),  # Changed from LENGTH to hook_length
+            "tone": action.get("TONE"),
+            "creativity": action.get("CREATIVITY"),
+            "text_in_image": action.get("TEXT_IN_IMAGE"),
+            "visual_style": action.get("VISUAL_STYLE"),
             "time_bucket": context.get("time_bucket"),
             "day_of_week": context.get("day_of_week"),
-            "action": action
+            "topic": None,  # Will be set from main.py
+            "business_id": None  # Will be set from main.py
         }).execute()
 
         if res.data and len(res.data) > 0 and "id" in res.data[0]:
             return res.data[0]["id"]
         else:
-            raise ValueError("Failed to insert action - no ID returned")    
+            raise ValueError("Failed to insert action - no ID returned")
     except Exception as e:
         print(f"Error inserting action for post_id {post_id}: {e}")
         raise
@@ -189,19 +196,23 @@ def insert_post_snapshot(post_id, platform, metrics):
     except Exception as e:
         print(f"Error inserting post snapshot for post_id {post_id}: {e}")
         raise
-def insert_reward(post_id, reward, baseline):
+def insert_reward(action_id, reward, baseline, platform):
     try:
         # Ensure numeric types
         reward = float(reward) if reward is not None else None
         baseline = float(baseline) if baseline is not None else None
 
         supabase.table("rl_rewards").insert({
-            "post_id": post_id,
-            "reward": reward,
-            "baseline": baseline
+            "action_id": action_id,  # Changed from post_id to action_id
+            "platform": platform,
+            "reward_value": reward,  # Changed from reward to reward_value
+            "baseline": baseline,
+            "deleted": False,
+            "days_to_delete": None,
+            "reward_window": "24h"
         }).execute()
     except Exception as e:
-        print(f"Error inserting reward for post_id {post_id}: {e}")
+        print(f"Error inserting reward for action_id {action_id}: {e}")
         raise
 def update_and_get_baseline(platform, reward, alpha=0.1):
     try:
