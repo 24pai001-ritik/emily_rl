@@ -304,43 +304,34 @@ def update_baseline_ema(previous_baseline: float, current_reward: float, beta: f
     """
     return (1 - beta) * previous_baseline + beta * current_reward
 
-def update_and_get_baseline(platform, reward, alpha=0.1):
+# Global baseline storage for mathematical baseline updates
+_platform_baselines = {}
+
+def get_platform_baseline(platform: str, default: float = 0.0) -> float:
+    """Get current baseline for a platform"""
+    return _platform_baselines.get(platform, default)
+
+def set_platform_baseline(platform: str, baseline: float):
+    """Set baseline for a platform"""
+    _platform_baselines[platform] = baseline
+
+def update_baseline_mathematical(platform: str, current_reward: float, beta: float = 0.1) -> float:
     """
-    Calculate baseline from historical rewards instead of maintaining a separate table.
-    This eliminates the need for rl_baselines table.
+    Pure mathematical baseline update using exponential moving average.
+
+    Formula: b_{t+1} = (1 - β) · b_t + β · R_t
+
+    This is the ONLY correct way for RL baseline calculation.
     """
-    print(f"📊 Calculating baseline for {platform}: current reward={reward:.4f}, alpha={alpha}")
+    previous_baseline = get_platform_baseline(platform, 0.0)
+    new_baseline = update_baseline_ema(previous_baseline, current_reward, beta)
 
-    try:
-        # Get last 10 rewards for this platform to calculate baseline
-        rewards_result = supabase.table("rl_rewards") \
-            .select("reward_value") \
-            .eq("platform", platform) \
-            .order("created_at", desc=True) \
-            .limit(10) \
-            .execute()
+    # Store the updated baseline
+    set_platform_baseline(platform, new_baseline)
 
-        if rewards_result.data and len(rewards_result.data) > 0:
-            # Calculate exponential moving average from recent rewards
-            recent_rewards = [r["reward_value"] for r in rewards_result.data if r["reward_value"] is not None]
+    print(f"📊 Mathematical baseline update for {platform}: {previous_baseline:.4f} → {new_baseline:.4f} (reward: {current_reward:.4f}, beta: {beta})")
 
-            if recent_rewards:
-                # Simple moving average of recent rewards
-                current_baseline = sum(recent_rewards) / len(recent_rewards)
-                print(f"   📈 Baseline from {len(recent_rewards)} recent rewards: {current_baseline:.4f}")
-            else:
-                current_baseline = 0.0
-                print(f"   📈 No valid recent rewards, using baseline: {current_baseline:.4f}")
-        else:
-            # No historical rewards, start with current reward as baseline
-            current_baseline = reward
-            print(f"   🆕 No historical rewards, using current reward as baseline: {current_baseline:.4f}")
-
-        return current_baseline
-
-    except Exception as e:
-        print(f"Error calculating baseline for platform {platform}: {e}")
-        return reward
+    return new_baseline
 def get_profile_embedding(profile_id):
     """Retrieve profile embedding from profiles table"""
     try:
@@ -659,8 +650,8 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
         if not action_id:
             print(f"   ⚠️  Warning: No action_id found, skipping rl_rewards insert")
         else:
-            # Calculate and update platform baseline
-            current_baseline = update_and_get_baseline(platform, reward_value)
+            # Calculate and update platform baseline using pure mathematics
+            current_baseline = update_baseline_mathematical(platform, reward_value, beta=0.1)
 
             supabase.table("rl_rewards").insert({
                 "action_id": action_id,  # Link to rl_actions record

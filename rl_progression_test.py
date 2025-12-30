@@ -90,7 +90,7 @@ def run_single_post_test(post_num, time_bucket, day_of_week, expected_reward_ran
         pref = db.get_preference(PLATFORM, time_bucket, day_of_week, dim, val)
         preferences[f"{dim}:{val}"] = pref
 
-    baseline = db.update_and_get_baseline(PLATFORM, reward)
+    baseline = db.update_baseline_mathematical(PLATFORM, reward, beta=0.1)
 
     print(f"💰 Reward: {reward_value:.4f}")
     print(f"📊 Baseline: {baseline:.4f}")

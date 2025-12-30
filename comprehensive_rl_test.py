@@ -82,20 +82,7 @@ def create_fake_post_snapshots(post_id, base_engagement, time_bucket, days_old=1
 
     return snapshots
 
-# Global baseline tracker for this test session
-test_baseline = {"instagram": 0.0}
-
-def get_test_baseline(platform):
-    """Get current test baseline"""
-    return test_baseline.get(platform, 0.0)
-
-def update_test_baseline(platform, new_reward, alpha=0.1):
-    """Update baseline using exponential moving average"""
-    current = get_test_baseline(platform)
-    updated = current + alpha * (new_reward - current)
-    test_baseline[platform] = updated
-    print(f"   📈 Baseline updated: {current:.4f} → {updated:.4f}")
-    return updated
+# Baseline is now managed mathematically by db.update_baseline_mathematical()
 
 def simulate_post_cycle(scenario, post_number):
     """Simulate a complete post cycle and return results"""
@@ -191,8 +178,8 @@ def simulate_post_cycle(scenario, post_number):
             pref = db.get_preference(PLATFORM, scenario["time"], scenario["day"], dim, val)
             preferences[f"{dim}:{val}"] = pref
 
-    # Update baseline with this reward (persistent across test)
-    current_baseline = update_test_baseline(PLATFORM, current_reward)
+    # Update baseline with this reward using pure mathematics (persistent across test)
+    current_baseline = db.update_baseline_mathematical(PLATFORM, current_reward, beta=0.1)
 
     # Trigger immediate RL update with our test baseline
     print(f"🧠 Triggering immediate RL update with baseline {current_baseline:.4f}...")

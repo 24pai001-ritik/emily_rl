@@ -82,8 +82,8 @@ async def process_rl_update_job(job: Job) -> Dict[str, Any]:
         context = action_data["context"]
         ctx_vec = action_data["ctx_vec"]
 
-        # Get current baseline
-        current_baseline = db.update_and_get_baseline(platform, reward_value)
+        # Get current baseline using pure mathematical update
+        current_baseline = db.update_baseline_mathematical(platform, reward_value, beta=0.1)
 
         # Update RL
         rl_agent.update_rl(
