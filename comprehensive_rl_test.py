@@ -17,25 +17,25 @@ import time
 BUSINESS_ID = "7648103e-81be-4fd9-b573-8e72e2fcbe5d"
 PLATFORM = "instagram"
 
-# Test data for different days and times
+# Test data for different days and times - REALISTIC engagement values
 test_scenarios = [
-    # Day 1-3: Learning morning preferences
-    {"day": 0, "time": "morning", "expected_action": "question", "engagement_multiplier": 1.2},
-    {"day": 1, "time": "morning", "expected_action": "question", "engagement_multiplier": 1.1},
-    {"day": 2, "time": "morning", "expected_action": "question", "engagement_multiplier": 0.9},
+    # Day 1-3: Learning morning preferences (lower engagement)
+    {"day": 0, "time": "morning", "expected_action": "question", "engagement_multiplier": 0.12},  # 12 engagement
+    {"day": 1, "time": "morning", "expected_action": "question", "engagement_multiplier": 0.15},  # 15 engagement
+    {"day": 2, "time": "morning", "expected_action": "question", "engagement_multiplier": 0.08},  # 8 engagement
 
-    # Day 4-6: Learning afternoon preferences
-    {"day": 3, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 1.3},
-    {"day": 4, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 1.4},
-    {"day": 5, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 1.2},
+    # Day 4-6: Learning afternoon preferences (higher engagement)
+    {"day": 3, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 0.25},  # 25 engagement
+    {"day": 4, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 0.30},  # 30 engagement
+    {"day": 5, "time": "afternoon", "expected_action": "story", "engagement_multiplier": 0.20},  # 20 engagement
 
-    # Day 7-9: Learning evening preferences + deleted post
-    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 1.5, "deleted": True},
-    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 1.6},
-    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 1.4},
+    # Day 7-9: Learning evening preferences + deleted post (peak engagement)
+    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 0.35, "deleted": True},  # 35 engagement but DELETED
+    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 0.40},  # 40 engagement
+    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 0.32},  # 32 engagement
 
     # Day 10: Final test with learned preferences
-    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 1.8},
+    {"day": 6, "time": "evening", "expected_action": "curiosity", "engagement_multiplier": 0.45},  # 45 engagement
 ]
 
 def create_fake_post_snapshots(post_id, base_engagement, time_bucket, days_old=1):
@@ -124,10 +124,10 @@ def simulate_post_cycle(scenario, post_number):
     print(f"📈 Generating engagement data...")
     if scenario.get("deleted", False):
         # Deleted posts get minimal/no engagement
-        base_engagement = 5  # Very low engagement for deleted posts
+        base_engagement = 0.5  # Very low engagement for deleted posts
         print(f"   🗑️  Deleted post - using minimal engagement: {base_engagement}")
     else:
-        base_engagement = 100 * scenario["engagement_multiplier"]
+        base_engagement = 10 * scenario["engagement_multiplier"]  # Realistic engagement scale
     snapshots = create_fake_post_snapshots(post_id, base_engagement, scenario["time"])
 
     # Insert snapshots
