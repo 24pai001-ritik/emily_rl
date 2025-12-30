@@ -282,6 +282,28 @@ def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_h
     except Exception as e:
         print(f"Error inserting post snapshot for post_id {post_id}: {e}")
         raise
+
+def update_baseline_ema(previous_baseline: float, current_reward: float, beta: float) -> float:
+    """
+    Reinforcement Learning utility for updating reward baseline using exponential moving average.
+
+    PURPOSE: Normalizes rewards for stable RL learning by maintaining a running average of past rewards.
+
+    FORMULA: b_{t+1} = (1 - β) · b_t + β · R_t
+
+    Args:
+        previous_baseline: b_t (current baseline value)
+        current_reward: R_t (latest reward from post engagement)
+        beta: β (baseline learning rate, typically 0.1, controls adaptation speed)
+
+    Returns:
+        updated_baseline: b_{t+1} (new baseline for next reward calculation)
+
+    Example:
+        update_baseline_ema(0.45, 0.72, 0.1) → 0.477
+    """
+    return (1 - beta) * previous_baseline + beta * current_reward
+
 def update_and_get_baseline(platform, reward, alpha=0.1):
     """
     Calculate baseline from historical rewards instead of maintaining a separate table.
