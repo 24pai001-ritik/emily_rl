@@ -10,55 +10,120 @@ from rl_agent import select_action
 PROMPT_TEMPLATE = """
 You are a Prompt Generator.
 
-Your task is to generate TWO FINAL PROMPTS from the given inputs:
-1) An IMAGE GENERATION PROMPT for Gemini
-2) A CAPTION GENERATION PROMPT for GPT-4o mini
+Your task is to generate EXACTLY TWO FINAL PROMPTS from the given inputs:
+1) A CAPTION GENERATION PROMPT for GPT-4o mini
+2) AN IMAGE GENERATION PROMPT for Gemini
 
-You must NOT generate the image or the caption yourself.
+You must NOT generate the caption or the image yourself.
 You must ONLY generate the prompts that will later be sent to those models.
+
+IMPORTANT ORDERING RULE:
+• The caption is generated FIRST
+• The image prompt MUST use BOTH the generated caption AND the business context as references
+• The image prompt MUST reference the caption using the placeholder {{CAPTION}}
 
 ────────────────────────────────
 INPUTS (ONE VALUE EACH, ALWAYS PROVIDED)
 ────────────────────────────────
 
-{{BUSINESS_CONTEXT}}
-{{BUSINESS_AESTHETIC}}
+business context  : {{BUSINESS_CONTEXT}}
 
-{{TOPIC}}
+Topic embedding : {{TOPIC_EMBEDDING}}
 
-{{HOOK_TYPE}}
-{{LENGTH}}
-{{TONE}}
-{{CREATIVITY}}
+Hook type: {{HOOK_TYPE}}
+Length : {{LENGTH}}
+Tone: {{TONE}}
+Creativity : {{CREATIVITY}}
 
-{{TEXT_IN_IMAGE}}
-{{VISUAL_STYLE}}
+Text in image : {{TEXT_IN_IMAGE}}
+Visual style : {{VISUAL_STYLE}}
 
 ────────────────────────────────
-OUTPUT REQUIREMENTS
+CREATIVE INTERPRETATION (STRICT)
 ────────────────────────────────
 
-Return a JSON object with exactly TWO keys:
+• LENGTH
+  - short → punchy, minimal, scroll-stopping
+  - medium → concise but slightly explanatory
+
+• TONE
+  - casual → friendly, conversational
+  - formal → professional, composed
+  - humorous → light, witty, brand-safe
+  - educational → clear, informative, structured
+
+• CREATIVITY
+  - safe → literal, conservative, low-risk
+  - balanced → clever but controlled
+  - experimental → bold phrasing, novel metaphors, still brand-safe
+
+• TEXT_IN_IMAGE
+  - "text in image" → include ONLY a short headline-style phrase
+  - "no text in image" → visual-only, no written words
+
+────────────────────────────────
+CAPTION REQUIREMENTS (STRICT)
+────────────────────────────────
+
+The caption_prompt MUST instruct the model to:
+
+- Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{TOPIC_EMBEDDING}}
+- Follow all creative controls strictly
+- Include relevant, platform-appropriate hashtags
+- STRICTLY include the hashtag: #workvillage
+- Place hashtags naturally at the end of the caption
+- Avoid spammy, generic, or misleading hashtags
+- Do NOT invent brand claims, metrics, or features
+- Do NOT include emojis unless TONE is casual or humorous
+
+────────────────────────────────
+IMAGE PROMPT REQUIREMENTS (STRICT)
+────────────────────────────────
+
+The image_prompt MUST instruct the model to:
+
+- Use {{CAPTION}} as the PRIMARY semantic reference for the visual
+- Use {{BUSINESS_CONTEXT}} as a SECONDARY reference to ensure:
+  • industry relevance  
+  • brand appropriateness  
+  • compliance with the business domain
+- Use {{BUSINESS_AESTHETIC}} to guide colors, mood, and visual language
+- Translate the intent, emotion, and message of {{CAPTION}} into a visual concept
+- Respect {{TEXT_IN_IMAGE}} rules strictly
+- Align with {{VISUAL_STYLE}}
+- NOT repeat the full caption verbatim inside the image
+- NOT introduce concepts, symbols, or claims that are not supported by {{CAPTION}} or {{BUSINESS_CONTEXT}}
+- NOT visually depict business details unless clearly implied by {{CAPTION}}
+
+────────────────────────────────
+OUTPUT REQUIREMENTS (NON-NEGOTIABLE)
+────────────────────────────────
+
+Return a VALID JSON object with EXACTLY TWO keys:
 
 {
-  "image_prompt": "...",
-  "caption_prompt": "..."
+  "caption_prompt": "...",
+  "image_prompt": "..."
 }
 
-Do NOT add any extra text, explanations, or markdown.
-Do NOT include the JSON keys inside the prompts themselves.
+• Do NOT add extra keys
+• Do NOT add explanations, markdown, or comments
+• Do NOT include the JSON keys inside the prompt text
+• Output must be machine-parseable JSON only
 
 ────────────────────────────────
-IMPORTANT CONSTRAINTS
+CRITICAL CONSTRAINTS
 ────────────────────────────────
 
-- You are a generator, not a creator
-- Do NOT improvise new variables
-- Do NOT change or reinterpret input values
-- Do NOT add strategy explanations
-- Output must be deterministic and structured
+- You are a generator, NOT a creator
+- Do NOT invent, infer, or modify any input values
+- Do NOT introduce new variables or placeholders (except {{CAPTION}})
+- Do NOT add examples, samples, or mock outputs
+- Do NOT explain strategy, reasoning, or intent
+- Do NOT mention tools, APIs, models, or the generation process
+- Do NOT sound salesy or promotional
 
-Your job ends after producing the two prompts.
+Your job ends immediately after producing the two prompts.
 """
 
 # ============================================================
@@ -316,7 +381,7 @@ def generate_prompts(inputs, business_embedding, topic_embedding, platform, date
     """
     REQUIRED inputs keys:
     BUSINESS_embedding
-    topic_embedding
+    TOPIC_EMBEDDING (embedding vector)
     platform
     date
     time
@@ -339,9 +404,8 @@ def generate_prompts(inputs, business_embedding, topic_embedding, platform, date
             inputs["INDUSTRIES"]
         )
 
-        # Generate trend-based prompts directly
+        # Generate trend-based prompts using embeddings
         image_prompt = f"""Create a trendy social media visual in the style: {selected_style}.
-Topic: {inputs['TOPIC']}
 Platform: {inputs['PLATFORM']}
 Creative controls: {action['LENGTH']} length, {action['TONE']} tone, {action['CREATIVITY']} creativity level.
 Visual style preference: {action['VISUAL_STYLE']}
@@ -349,7 +413,6 @@ Text in image: {action['TEXT_IN_IMAGE']}
 Make it engaging and brand-appropriate for {inputs['BUSINESS_TYPES']} in {inputs['INDUSTRIES']}."""
 
         caption_prompt = f"""Write a trendy social media caption following this style: {selected_style}.
-Topic: {inputs['TOPIC']}
 Platform: {inputs['PLATFORM']}
 Creative controls: {action['LENGTH']} length, {action['TONE']} tone, {action['CREATIVITY']} creativity level.
 Make it engaging and brand-appropriate for {inputs['BUSINESS_TYPES']} in {inputs['INDUSTRIES']}.

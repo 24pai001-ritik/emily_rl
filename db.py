@@ -10,12 +10,12 @@ from datetime import datetime, timedelta
 load_dotenv()
 
 # Reward weights for different time periods (higher weight = more important)
-REWARD_WEIGHTS = {
-    6: 0.1,   # 6 hours - early engagement
-    24: 0.5,  # 24 hours - primary engagement window
-    48: 0.3,  # 48 hours - sustained engagement
-    72: 0.15, # 72 hours - long-term engagement
-    168: 0.05 # 1 week - viral potential
+REWARD_WEIGHTS = {     # at alpha = 0.35
+    6:   0.396,
+    24:  0.258,
+    48:  0.168,
+    72:  0.109,
+    168: 0.071
 }
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -28,6 +28,43 @@ try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     raise ValueError(f"Failed to create Supabase client: {e}")
+
+def calculate_platform_engagement(platform: str, metrics: dict) -> float:
+    """
+    Calculate platform-specific engagement score.
+    Shared utility function used by both reward calculation methods.
+    """
+    if platform == "instagram":
+        # Instagram values SAVES the most
+        return (
+            3.0 * metrics.get("saves", 0) +
+            2.0 * metrics.get("shares", 0) +
+            1.0 * metrics.get("comments", 0) +
+            0.3 * metrics.get("likes", 0)
+        )
+    elif platform == "x":
+        # X values REPLIES the most
+        return (
+            3.0 * metrics.get("replies", 0) +
+            2.0 * metrics.get("retweets", 0) +
+            1.0 * metrics.get("likes", 0)
+        )
+    elif platform == "linkedin":
+        # LinkedIn values COMMENTS + SHARES
+        return (
+            3.0 * metrics.get("comments", 0) +
+            2.0 * metrics.get("shares", 0) +
+            1.0 * metrics.get("likes", 0)
+        )
+    elif platform == "facebook":
+        # Facebook values COMMENTS + SHARES
+        return (
+            3.0 * metrics.get("comments", 0) +
+            2.0 * metrics.get("shares", 0) +
+            1.0 * metrics.get("reactions", 0)
+        )
+    else:
+        raise ValueError(f"Unsupported platform: {platform}")
 
 # ---------- PREFERENCES ----------
 
@@ -190,6 +227,8 @@ def create_post_reward_record(profile_id, post_id, platform, action_id=None):
         #     reward_data["action_id"] = action_id
 
         supabase.table("post_rewards").insert(reward_data).execute()
+        print(f"reward data inserted successfully")
+        print(f"reward data: {reward_data}")
     except Exception as e:
         print(f"Error creating post reward record for {post_id}: {e}")
         raise
@@ -242,24 +281,6 @@ def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_h
         supabase.table("post_snapshots").insert(snapshot_data).execute()
     except Exception as e:
         print(f"Error inserting post snapshot for post_id {post_id}: {e}")
-        raise
-def insert_reward(action_id, reward, baseline, platform):
-    try:
-        # Ensure numeric types
-        reward = float(reward) if reward is not None else None
-        baseline = float(baseline) if baseline is not None else None
-
-        supabase.table("rl_rewards").insert({
-            "action_id": action_id,  # Changed from post_id to action_id
-            "platform": platform,
-            "reward_value": reward,  # Changed from reward to reward_value
-            "baseline": baseline,
-            "deleted": False,
-            "days_to_delete": None,
-            "reward_window": "24h"
-        }).execute()
-    except Exception as e:
-        print(f"Error inserting reward for action_id {action_id}: {e}")
         raise
 def update_and_get_baseline(platform, reward, alpha=0.1):
     print(f"📊 Updating baseline for {platform}: current reward={reward:.4f}, alpha={alpha}")
@@ -338,6 +359,45 @@ def get_profile_embedding_with_fallback(profile_id):
     print(f"Profile embedding not found for {profile_id}, using random embedding")
     return np.random.rand(384).astype("float32")
 
+def get_profile_business_data(profile_id):
+    """Fetch business-related data from profiles table"""
+    try:
+        res = supabase.table("profiles").select(
+            "business_name, business_type, industry, business_description, brand_voice, brand_tone"
+        ).eq("id", profile_id).execute()
+
+        if res.data and len(res.data) > 0:
+            profile = res.data[0]
+
+            # Provide defaults if fields are None
+            return {
+                "business_name": profile.get("business_name", "Business"),
+                "business_types": profile.get("business_type", ["General"]),
+                "industries": profile.get("industry", ["General"]),
+                "business_description": profile.get("business_description", "A business focused on growth and success"),
+                "brand_voice": profile.get("brand_voice", "Professional and approachable"),
+                "brand_tone": profile.get("brand_tone", "Friendly and informative")
+            }
+
+        return {
+            "business_name": "Business",
+            "business_types": ["General"],
+            "industries": ["General"],
+            "business_description": "A business focused on growth and success",
+            "brand_voice": "Professional and approachable",
+            "brand_tone": "Friendly and informative"
+        }
+    except Exception as e:
+        print(f"Error fetching profile business data for {profile_id}: {e}")
+        return {
+            "business_name": "Business",
+            "business_types": ["General"],
+            "industries": ["General"],
+            "business_description": "A business focused on growth and success",
+            "brand_voice": "Professional and approachable",
+            "brand_tone": "Friendly and informative"
+        }
+
 
 def get_post_metrics(post_id, platform):
     """Fetch real metrics for a post from database"""
@@ -359,19 +419,6 @@ def get_post_metrics(post_id, platform):
         print(f"Error fetching metrics for post {post_id}: {e}")
         return None
 
-
-def get_real_platform_metrics(post_id, platform):
-    """Get real metrics from database or API"""
-    # Option 1: Fetch from your database
-    metrics = get_post_metrics(post_id, platform)
-    if metrics:
-        return metrics
-
-    # Option 2: Call social media API if not in DB yet
-    # return call_instagram_api(post_id) or call_twitter_api(post_id)
-
-    # Option 3: Return zeros if no data (for very new posts)
-    return {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "replies": 0, "retweets": 0, "reactions": 0, "follower_count": 0}
 
 
 def get_post_reward(profile_id: str, post_id: str, platform: str):
@@ -399,9 +446,32 @@ def get_post_snapshots(profile_id: str, post_id: str, platform: str):
         .execute()
     )
     return res.data
-def calculate_reward_from_snapshots(snapshots: list, platform: str) -> float:
+def calculate_reward_from_snapshots(snapshots: list, platform: str, post_id: str = None) -> float:
     reward = 0.0
     print(f"🔢 Calculating reward for {platform} with {len(snapshots)} snapshots")
+
+    # Check if post is deleted for penalty calculation
+    deleted = False
+    days_since_post = None
+
+    if post_id:
+        try:
+            # Check post status in post_contents table
+            post_result = supabase.table("post_contents").select("status, created_at").eq("post_id", post_id).eq("platform", platform).execute()
+            if post_result.data and len(post_result.data) > 0:
+                post_data = post_result.data[0]
+                if post_data.get("status") == "deleted":
+                    deleted = True
+                    # Calculate days since post creation for penalty scaling
+                    if post_data.get("created_at"):
+                        created_at = datetime.fromisoformat(post_data["created_at"].replace('Z', '+00:00'))
+                        current_time = datetime.utcnow()
+                        if created_at.tzinfo is not None:
+                            created_at = created_at.replace(tzinfo=None)
+                        days_since_post = (current_time - created_at).days
+                        print(f"   🗑️  Post is deleted ({days_since_post} days ago), applying penalty")
+        except Exception as e:
+            print(f"   ⚠️  Could not check post deletion status: {e}")
 
     for snap in snapshots:
         t = snap["timeslot_hours"]
@@ -410,48 +480,35 @@ def calculate_reward_from_snapshots(snapshots: list, platform: str) -> float:
         if not weight:
             continue
 
-        # Platform-specific engagement calculation
-        if platform == "instagram":
-            # Instagram values SAVES the most
-            engagement = (
-                3.0 * snap.get("saves", 0) +
-                2.0 * snap.get("shares", 0) +
-                1.0 * snap.get("comments", 0) +
-                0.3 * snap.get("likes", 0)
-            )
-        elif platform == "x":
-            # X values REPLIES the most
-            engagement = (
-                3.0 * snap.get("replies", 0) +
-                2.0 * snap.get("retweets", 0) +
-                1.0 * snap.get("likes", 0)
-            )
-        elif platform == "linkedin":
-            # LinkedIn values COMMENTS + SHARES
-            engagement = (
-                3.0 * snap.get("comments", 0) +
-                2.0 * snap.get("shares", 0) +
-                1.0 * snap.get("likes", 0)
-            )
-        elif platform == "facebook":
-            # Facebook values COMMENTS + SHARES
-            engagement = (
-                3.0 * snap.get("comments", 0) +
-                2.0 * snap.get("shares", 0) +
-                1.0 * snap.get("reactions", 0)
-            )
-        else:
-            raise ValueError(f"Unsupported platform: {platform}")
+        # Platform-specific engagement calculation using shared utility
+        engagement = calculate_platform_engagement(platform, snap)
 
         # Apply time-based weighting
         weighted_engagement = weight * engagement
         reward += weighted_engagement
         print(f"   📊 {t}h snapshot: {engagement:.2f} engagement × {weight} weight = {weighted_engagement:.4f}")
 
-    # Apply normalization (same as rl_agent.py compute_reward)
+    # Apply normalization (log normalization with tanh bounding)
     followers = max(snapshots[0].get("follower_count", 1), 1) if snapshots else 1
     raw_score = math.log(1 + reward) / math.log(1 + followers)
     final_reward = math.tanh(raw_score)
+
+    # -------------------------
+    # 3️⃣ Delete penalty (human negative feedback)
+    # -------------------------
+    if deleted:
+        # Early delete = strong negative signal
+        if days_since_post is None:
+            penalty = 0.7
+        else:
+            # exponential decay penalty
+            penalty = 0.7 * math.exp(-days_since_post / 3.0)
+
+        print(f"   💥 Applying deletion penalty: -{penalty:.4f} (days_since_post: {days_since_post})")
+        final_reward -= penalty
+
+        # Ensure reward doesn't go below -1
+        final_reward = max(final_reward, -1.0)
 
     print(f"   📈 Total reward: {reward:.4f}, Followers: {followers}, Raw score: {raw_score:.4f}, Final reward: {final_reward:.4f}")
 
@@ -520,7 +577,7 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
             "reward": None
         }
 
-    reward_value = calculate_reward_from_snapshots(snapshots, platform)
+    reward_value = calculate_reward_from_snapshots(snapshots, platform, post_id)
 
     try:
         print(f"   💾 Updating reward record with calculated value: {reward_value}")
@@ -547,11 +604,14 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
         if not action_id:
             print(f"   ⚠️  Warning: No action_id found, skipping rl_rewards insert")
         else:
+            # Calculate and update platform baseline
+            current_baseline = update_and_get_baseline(platform, reward_value)
+
             supabase.table("rl_rewards").insert({
                 "action_id": action_id,  # Link to rl_actions record
                 "platform": platform,
                 "reward_value": reward_value,
-                "baseline": 0.0,  # Will be updated by baseline calculation
+                "baseline": current_baseline,  # Now using actual calculated baseline
                 "deleted": False,
                 "days_to_delete": None,
                 "reward_window": "24h"

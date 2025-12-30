@@ -21,8 +21,9 @@ import numpy as np
 #from campaign import topic,date,time,platform
 
 import db
-from rl_agent import update_rl, compute_reward
+from rl_agent import update_rl
 from generate import generate_prompts
+from job_queue import queue_reward_calculation_job
 
 # -------------------------------------------------
 # CONFIG
@@ -30,7 +31,7 @@ from generate import generate_prompts
  
 PLATFORM = "instagram"
 BUSINESS_ID = "7648103e-81be-4fd9-b573-8e72e2fcbe5d"
-FOLLOWERS = 1816
+
 
 # -------------------------------------------------
 # SIMPLE HELPERS (later replace with real systems)
@@ -49,26 +50,25 @@ FOLLOWERS = 1816
 # MAIN LOOP
 # -------------------------------------------------
 
-def run_one_post(topic, platform, date, time):
+def run_one_post(topic_embedding, platform, date, time):
     print(f"\n🚀 Starting new post cycle for {platform} at {date} {time}")
 
     # ---------- 1️⃣ BUSINESS CONTEXT ----------
     
 
 
-    # embeddings (replace with real embedding service)
-    # Get business embedding from profiles table
+    # Get business embedding and profile data from profiles table
     business_embedding = db.get_profile_embedding_with_fallback(BUSINESS_ID)
-    topic_embedding = np.random.rand(384).astype("float32")  # Keep random for now or implement topic embeddings
+    profile_data = db.get_profile_business_data(BUSINESS_ID)
 
     # ---------- 2️⃣ GENERATE PROMPTS (RL INSIDE) ----------
     inputs = {
         "BUSINESS_CONTEXT": business_embedding,
-        "BUSINESS_AESTHETIC": "modern, professional, clean design",  # Default aesthetic
-        "BUSINESS_TYPES": ["Technology"],  # Default business types
-        "INDUSTRIES": ["Technology/IT"],  # Default industries
-        "BUSINESS_DESCRIPTION": "A technology company focused on AI and marketing solutions",  # Default description
-        "TOPIC": topic,
+        "BUSINESS_AESTHETIC": profile_data["brand_voice"],  # Use brand voice as aesthetic
+        "BUSINESS_TYPES": profile_data["business_types"],
+        "INDUSTRIES": profile_data["industries"],
+        "BUSINESS_DESCRIPTION": profile_data["business_description"],
+        "TOPIC_EMBEDDING": topic_embedding,
         "PLATFORM": platform,
         "DATE": date,
         "TIME": time
@@ -103,17 +103,17 @@ def run_one_post(topic, platform, date, time):
     # ---------- 4️⃣ STORE POST CONTENT ----------
     # Extract prompts based on mode (handle both trendy and standard modes)
     image_prompt = result.get("image_prompt",
-        f"Create an image for topic: {topic} with {action['VISUAL_STYLE']} style, {action['TONE']} tone, {action['CREATIVITY']} creativity level. Make it engaging for {platform}.")
+        f"Create an image with {action['VISUAL_STYLE']} style, {action['TONE']} tone, {action['CREATIVITY']} creativity level. Make it engaging for {platform}.")
 
     caption_prompt = result.get("caption_prompt",
-        f"Write a {action['TONE']} caption about {topic} in {action['LENGTH']} length with {action['CREATIVITY']} creativity level. Make it suitable for {platform}.")
+        f"Write a {action['TONE']} caption in {action['LENGTH']} length with {action['CREATIVITY']} creativity level. Make it suitable for {platform}.")
 
     db.insert_post_content(
         post_id=post_id,
         action_id=action_id,
         platform=platform,
         business_id=BUSINESS_ID,
-        topic=topic,
+        topic="topic_from_embedding",  # Placeholder since we're now using embeddings
         post_type="educational",  # Default post type
         business_context=str(business_embedding),  # Convert embedding to string
         business_aesthetic="modern, professional, clean design",  # Default aesthetic
@@ -134,12 +134,11 @@ def run_one_post(topic, platform, date, time):
     db.create_post_reward_record(BUSINESS_ID, post_id, platform, action_id)
 
     # ---------- 6️⃣ QUEUE REWARD CALCULATION FOR WORKER ----------
-    # In production: Queue job for worker to calculate reward asynchronously
-    # This prevents blocking the main thread and ensures proper delayed reward calculation
-    # db.queue_rl_update_job(post_id, action, context, ctx_vec)
-    print("📋 RL update queued for worker processing (production)")
+    # Queue reward calculation job (will automatically trigger RL update when ready)
+    job_id = queue_reward_calculation_job(BUSINESS_ID, post_id, platform)
+    print(f"📋 Reward calculation queued for worker processing (job: {job_id})")
 
-    print("🧠 RL updated successfully")
+    print("✅ Post cycle completed - RL learning will happen asynchronously")
 
 
 # -------------------------------------------------
@@ -147,9 +146,12 @@ def run_one_post(topic, platform, date, time):
 # -------------------------------------------------
 
 if __name__ == "__main__":
-    # Example usage: topic, platform, date, time
+    # Example usage: topic_embedding, platform, date, time
+    import numpy as np
+    sample_topic_embedding = np.random.rand(384).astype("float32")  # Sample embedding
+
     run_one_post(
-        topic="AI for marketing",
+        topic_embedding=sample_topic_embedding,
         platform="instagram",
         date="2024-12-26",
         time="evening"
