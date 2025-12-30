@@ -50,11 +50,17 @@ BUSINESS_ID = "7648103e-81be-4fd9-b573-8e72e2fcbe5d"
 # MAIN LOOP
 # -------------------------------------------------
 
-def run_one_post(topic_embedding, platform, date, time):
-    print(f"\n🚀 Starting new post cycle for {platform} at {date} {time}")
+def run_one_post(topic_embedding, platform, time=None, day_of_week=None):
+    # Get user's scheduling preferences if not provided
+    if time is None or day_of_week is None:
+        scheduling_prefs = db.get_profile_scheduling_prefs(BUSINESS_ID)
+        time = time or scheduling_prefs["time_bucket"]
+        day_of_week = day_of_week if day_of_week is not None else scheduling_prefs["day_of_week"]
+
+    print(f"\n🚀 Starting new post cycle for {platform} at {time} (day {day_of_week})")
 
     # ---------- 1️⃣ BUSINESS CONTEXT ----------
-    
+
 
 
     # Get business embedding and profile data from profiles table
@@ -70,7 +76,6 @@ def run_one_post(topic_embedding, platform, date, time):
         "BUSINESS_DESCRIPTION": profile_data["business_description"],
         "TOPIC_EMBEDDING": topic_embedding,
         "PLATFORM": platform,
-        "DATE": date,
         "TIME": time
     }
 
@@ -79,8 +84,8 @@ def run_one_post(topic_embedding, platform, date, time):
         business_embedding,
         topic_embedding,
         platform,
-        date,
-        time
+        time,
+        day_of_week
     )
 
     # Extract values based on mode
@@ -146,13 +151,13 @@ def run_one_post(topic_embedding, platform, date, time):
 # -------------------------------------------------
 
 if __name__ == "__main__":
-    # Example usage: topic_embedding, platform, date, time
+    # Example usage: topic_embedding, platform, time=None, day_of_week=None
+    # If time/day_of_week not provided, uses user's profile preferences
     import numpy as np
     sample_topic_embedding = np.random.rand(384).astype("float32")  # Sample embedding
 
     run_one_post(
         topic_embedding=sample_topic_embedding,
         platform="instagram",
-        date="2024-12-26",
-        time="evening"
+         # Thursday (0=Monday, 6=Sunday)
     )

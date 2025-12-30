@@ -101,7 +101,7 @@ def update_preference(platform, time_bucket, day, dimension, value, delta):
 
     Current implementation includes error handling and retry logic as mitigation.
     """
-    print(f"🔄 Updating preference: {platform} | {time_bucket} | Day {day} | {dimension}={value} | delta={delta:.6f}")
+    print(f"Updating preference: {platform} | {time_bucket} | Day {day} | {dimension}={value} | delta={delta:.6f}")
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -283,34 +283,41 @@ def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_h
         print(f"Error inserting post snapshot for post_id {post_id}: {e}")
         raise
 def update_and_get_baseline(platform, reward, alpha=0.1):
-    print(f"📊 Updating baseline for {platform}: current reward={reward:.4f}, alpha={alpha}")
+    """
+    Calculate baseline from historical rewards instead of maintaining a separate table.
+    This eliminates the need for rl_baselines table.
+    """
+    print(f"📊 Calculating baseline for {platform}: current reward={reward:.4f}, alpha={alpha}")
+
     try:
-        res = supabase.table("rl_baselines") \
-            .select("value") \
+        # Get last 10 rewards for this platform to calculate baseline
+        rewards_result = supabase.table("rl_rewards") \
+            .select("reward_value") \
             .eq("platform", platform) \
+            .order("created_at", desc=True) \
+            .limit(10) \
             .execute()
 
-        if res.data and len(res.data) > 0 and "value" in res.data[0]:
-            baseline = float(res.data[0]["value"])
-            new_baseline = baseline + alpha * (reward - baseline)
+        if rewards_result.data and len(rewards_result.data) > 0:
+            # Calculate exponential moving average from recent rewards
+            recent_rewards = [r["reward_value"] for r in rewards_result.data if r["reward_value"] is not None]
 
-            print(f"   📈 Baseline updated: {baseline:.4f} → {new_baseline:.4f}")
-            supabase.table("rl_baselines").update({
-                "value": new_baseline,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("platform", platform).execute()
-
-            return new_baseline
+            if recent_rewards:
+                # Simple moving average of recent rewards
+                current_baseline = sum(recent_rewards) / len(recent_rewards)
+                print(f"   📈 Baseline from {len(recent_rewards)} recent rewards: {current_baseline:.4f}")
+            else:
+                current_baseline = 0.0
+                print(f"   📈 No valid recent rewards, using baseline: {current_baseline:.4f}")
         else:
-            # Insert new baseline
-            print(f"   🆕 Creating new baseline: {reward:.4f}")
-            supabase.table("rl_baselines").insert({
-                "platform": platform,
-                "value": reward
-            }).execute()
-            return reward
+            # No historical rewards, start with current reward as baseline
+            current_baseline = reward
+            print(f"   🆕 No historical rewards, using current reward as baseline: {current_baseline:.4f}")
+
+        return current_baseline
+
     except Exception as e:
-        print(f"Error updating baseline for platform {platform}: {e}")
+        print(f"Error calculating baseline for platform {platform}: {e}")
         return reward
 def get_profile_embedding(profile_id):
     """Retrieve profile embedding from profiles table"""
@@ -396,6 +403,32 @@ def get_profile_business_data(profile_id):
             "business_description": "A business focused on growth and success",
             "brand_voice": "Professional and approachable",
             "brand_tone": "Friendly and informative"
+        }
+
+def get_profile_scheduling_prefs(profile_id):
+    """Fetch user's preferred scheduling day and time from profiles table"""
+    try:
+        res = supabase.table("profiles").select(
+            "day_of_week, time_bucket"
+        ).eq("id", profile_id).execute()
+
+        if res.data and len(res.data) > 0:
+            profile = res.data[0]
+            return {
+                "day_of_week": profile.get("day_of_week"),
+                "time_bucket": profile.get("time_bucket")
+            }
+
+        # Fallback defaults if no data found
+        return {
+            "day_of_week": 3,  # Thursday
+            "time_bucket": "evening"
+        }
+    except Exception as e:
+        print(f"Error fetching profile scheduling preferences for {profile_id}: {e}")
+        return {
+            "day_of_week": 3,  # Thursday
+            "time_bucket": "evening"
         }
 
 
@@ -497,12 +530,12 @@ def calculate_reward_from_snapshots(snapshots: list, platform: str, post_id: str
     # 3️⃣ Delete penalty (human negative feedback)
     # -------------------------
     if deleted:
-        # Early delete = strong negative signal
-        if days_since_post is None:
-            penalty = 0.7
+        # Deleted post = very strong negative signal
+        if days_since_post is None or days_since_post == 0:
+            penalty = 1.5  # Immediate deletion = maximum penalty
         else:
-            # exponential decay penalty
-            penalty = 0.7 * math.exp(-days_since_post / 3.0)
+            # exponential decay penalty (stronger than before)
+            penalty = 1.2 * math.exp(-days_since_post / 2.0)
 
         print(f"   💥 Applying deletion penalty: -{penalty:.4f} (days_since_post: {days_since_post})")
         final_reward -= penalty
@@ -566,7 +599,7 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
                 }
 
     # 3️⃣ Eligible or eligible status → calculate ONCE
-    print(f"   🔄 Calculating reward (status: {status})")
+    print(f"   Calculating reward (status: {status})")
     snapshots = get_post_snapshots(profile_id, post_id, platform)
 
     if not snapshots:

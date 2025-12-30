@@ -30,7 +30,7 @@ async def process_reward_calculation_job(job: Job) -> Dict[str, Any]:
         post_id = payload["post_id"]
         platform = payload["platform"]
 
-        print(f"🔄 Processing reward calculation for {post_id} on {platform}")
+        print(f"Processing reward calculation for {post_id} on {platform}")
 
         # Calculate reward
         result = db.fetch_or_calculate_reward(profile_id, post_id, platform)
@@ -151,7 +151,7 @@ def job_worker():
 
     while True:
         try:
-            print("🔄 Job worker waiting for jobs...")
+            print("Job worker waiting for jobs...")
             job = job_queue.get()  # Blocking get
             print(f"📥 Job worker received job: {job.job_id}")
             job.status = "running"
@@ -209,7 +209,7 @@ def start_job_worker():
 
     worker_thread = threading.Thread(target=run_worker, daemon=True)
     worker_thread.start()
-    print("🔄 RL job worker started in background thread")
+    print("RL job worker started in background thread")
 
 def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get status of a job"""

@@ -77,7 +77,6 @@ create table rl_rewards (
 );
 
 
-
 create table public.post_snapshots (
   id uuid primary key default gen_random_uuid(),
 
