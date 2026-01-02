@@ -6,6 +6,7 @@ import numpy as np
 from dotenv import load_dotenv
 from supabase import create_client
 from datetime import datetime, timedelta, timezone
+import pytz
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,8 +20,8 @@ REWARD_WEIGHTS = {     # at alpha = 0.35
     168: 0.071
 }
 
-# Indian Standard Time (IST) - UTC+5:30
-IST = timezone(timedelta(hours=5, minutes=30))
+# Indian Standard Time (IST) - Asia/Kolkata
+IST = pytz.timezone("Asia/Kolkata")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -170,8 +171,6 @@ def insert_post_content(
     platform,
     business_id,
     topic,
-    # business_context,
-    # business_aesthetic,
     image_prompt,
     caption_prompt,
     generated_caption,
@@ -184,8 +183,6 @@ def insert_post_content(
             "platform": platform,
             "business_id": business_id,
             "topic": topic,
-            # "business_context": business_context,
-            # "business_aesthetic": business_aesthetic,
             "image_prompt": image_prompt,
             "caption_prompt": caption_prompt,
             "generated_caption": generated_caption,
@@ -385,7 +382,7 @@ def get_profile_business_data(profile_id):
     """Fetch business-related data from profiles table"""
     try:
         res = supabase.table("profiles").select(
-            "business_name, business_type, industry, business_description, brand_voice, brand_tone"
+            "business_name, business_type, industry, business_description, brand_voice, brand_tone, target_audience, unique_value_proposition, customer_pain_points, primary_color, secondary_color"
         ).eq("id", profile_id).execute()
 
         if res.data and len(res.data) > 0:
@@ -445,6 +442,56 @@ def get_profile_scheduling_prefs(profile_id):
             "day_of_week": 3,  # Thursday
             "time_bucket": "evening"
         }
+
+
+def get_today_day_of_week_ist():
+    """
+    Returns today's day_of_week in IST.
+    Monday = 0, Sunday = 6
+    """
+    return datetime.now(IST).weekday()
+
+
+def get_all_profile_ids():
+    """
+    Returns a list of all profile IDs from the profiles table.
+    Used for iterating over all businesses in the system.
+    """
+    try:
+        res = supabase.table("profiles").select("id").execute()
+
+        if res.data:
+            return [profile["id"] for profile in res.data]
+        else:
+            return []
+
+    except Exception as e:
+        print(f"Error fetching all profile IDs: {e}")
+        return []
+
+
+def should_create_post_today(profile_id) -> bool:
+    """
+    Returns True if today (IST) matches profile.day_of_week
+    """
+    # Get today's day of week in IST
+    today_day = get_today_day_of_week_ist()
+
+    # Get profile scheduling preferences
+    scheduling_prefs = get_profile_scheduling_prefs(profile_id)
+
+    # Extract profile day_of_week
+    profile_day = scheduling_prefs.get("day_of_week")
+
+    # Validate profile_day
+    if profile_day is None:
+        return False
+
+    if not isinstance(profile_day, int) or profile_day < 0 or profile_day > 6:
+        return False
+
+    # Return True only if today matches profile day
+    return today_day == profile_day
 
 
 def get_post_metrics(post_id, platform):

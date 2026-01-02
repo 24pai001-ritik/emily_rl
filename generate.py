@@ -115,7 +115,7 @@ def generate_topic(
       "reasoning": str
     }
     """
-
+    print(f"Business context: {business_context}")
     filled_prompt = TOPIC_GENERATOR
     filled_prompt = filled_prompt.replace("{{BUSINESS_CONTEXT}}", business_context)
     filled_prompt = filled_prompt.replace("{{PLATFORM}}", platform)
@@ -174,7 +174,8 @@ def generate_prompts(
     platform: str,
     time: str,
     day_of_week: int,
-    topic_text: str,profile_data: dict
+    topic_text: str,profile_data: dict,
+    business_context: str
 ) -> dict:
     """
     Single execution point between RL and LLMs.
@@ -213,7 +214,7 @@ def generate_prompts(
         merged_with_style = {
             **merged,
             "selected_style": selected_style,
-            "BUSINESS_CONTEXT": business_embedding,
+            "BUSINESS_CONTEXT": business_context,
             "BUSINESS_AESTHETIC": profile_data["brand_voice"],
             "BUSINESS_TYPES": profile_data["business_types"],
             "INDUSTRIES": profile_data["industries"],
@@ -257,7 +258,7 @@ def generate_prompts(
     merged = {
     **inputs,
     **action,
-    "BUSINESS_CONTEXT": profile_data["business_description"],
+    "BUSINESS_CONTEXT": business_context,
     "BUSINESS_AESTHETIC": profile_data["brand_voice"],
     "BUSINESS_TYPES": profile_data["business_types"],
     "INDUSTRIES": profile_data["industries"],

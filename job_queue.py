@@ -5,10 +5,11 @@ import time
 import threading
 from queue import Queue
 from typing import Dict, Any, Optional
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+import pytz
 
-# Indian Standard Time (IST) - UTC+5:30
-IST = timezone(timedelta(hours=5, minutes=30))
+# Indian Standard Time (IST) - Asia/Kolkata
+IST = pytz.timezone("Asia/Kolkata")
 import db
 import rl_agent
 

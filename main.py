@@ -16,11 +16,12 @@ Flow:
 import uuid
 import time
 import random
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import numpy as np
+import pytz
 
-# Indian Standard Time (IST) - UTC+5:30
-IST = timezone(timedelta(hours=5, minutes=30))
+# Indian Standard Time (IST) - Asia/Kolkata
+IST = pytz.timezone("Asia/Kolkata")
 #from campaign import topic,date,time,platform
 
 import db
@@ -54,7 +55,7 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
 
     #generate topic
     topic_data = generate_topic(
-    business_context=profile_data["business_description"],
+    business_context=str(profile_data),
     platform=platform,
     date=date)
     topic_text = topic_data["topic"]
@@ -72,7 +73,7 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         "BUSINESS_AESTHETIC": profile_data["brand_voice"],  # Use brand voice as aesthetic
         "BUSINESS_TYPES": profile_data["business_types"],
         "INDUSTRIES": profile_data["industries"],
-        "BUSINESS_DESCRIPTION": profile_data["business_description"]
+        "BUSINESS_DESCRIPTION": profile_data["business_description"],
     }
 
     result = generate_prompts(
@@ -82,7 +83,8 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         platform,
         time,
         day_of_week,
-        topic_text,profile_data
+        topic_text,profile_data,
+        business_context=profile_data,
     )
 
     # Extract values based on mode
@@ -153,24 +155,43 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
 
     print("✅ Post cycle completed - RL learning will happen asynchronously")
 
-
 # -------------------------------------------------
 # ENTRY POINT
 # -------------------------------------------------
 ALLOWED_PLATFORMS = {"instagram","facebook"}
-BUSINESS_ID = "58d91fe2-1401-46fd-b183-a2a118997fc1"
-user_connected_platforms = db.get_connected_platforms(BUSINESS_ID)
 
 if __name__ == "__main__":
-    
-    for platform in user_connected_platforms:
-        platform = platform.lower().strip()  # normalize
 
-        if platform not in ALLOWED_PLATFORMS:
-            print(f"❌ Skipping unsupported platform: {platform}")
-            continue  # skip unsupported platforms
-        start_job_worker()
-        run_one_post(
-            BUSINESS_ID = "58d91fe2-1401-46fd-b183-a2a118997fc1",
-            platform=platform,
-        )
+    # Get all business profiles
+    all_business_ids = db.get_all_profile_ids()
+    print(f"📊 Found {len(all_business_ids)} business profiles to check")
+
+    # Process each business
+    for business_id in all_business_ids:
+        print(f"\n🏢 Processing business: {business_id}")
+
+        # Check if this business should create posts today
+        if not db.should_create_post_today(business_id):
+            print(f"⏸️ Skipping business {business_id} — not scheduled for today (IST)")
+            continue
+
+        # Get connected platforms for this business
+        user_connected_platforms = (db.get_connected_platforms(business_id)).unique()
+        print(f"📱 Business {business_id} has {len(user_connected_platforms)} connected platforms: {user_connected_platforms}")
+
+        # Create posts for each platform
+        for platform in user_connected_platforms:
+            platform = platform.lower().strip()  # normalize
+
+            if platform not in ALLOWED_PLATFORMS:
+                print(f"❌ Skipping unsupported platform: {platform} for business {business_id}")
+                continue  # skip unsupported platforms
+
+            print(f"🚀 Creating post for business {business_id} on {platform}")
+            start_job_worker()
+            run_one_post(
+                BUSINESS_ID=business_id,
+                platform=platform,
+            )
+
+    print("\n✅ Daily post creation process completed for all businesses")

@@ -6,3 +6,4 @@ google-genai
 langchain-openai
 langchain-core
 requests
+pytz
