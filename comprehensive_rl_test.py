@@ -143,10 +143,19 @@ def simulate_post_cycle(scenario, post_number):
         platform=PLATFORM,
         business_id=BUSINESS_ID,
         topic="test topic",
+<<<<<<< HEAD
         image_prompt="test image prompt",
         caption_prompt="test caption prompt",
         generated_caption="test generated caption",
         generated_image_url="https://example.com/test-image.jpg"
+=======
+        post_type="educational",
+        business_context="test context",
+        business_aesthetic="test aesthetic",
+        image_prompt="test image prompt",
+        caption_prompt="test caption prompt",
+        status="deleted" if scenario.get("deleted", False) else "generated"
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     )
 
     # 4. Mark post as deleted if needed (already handled in post_content creation)

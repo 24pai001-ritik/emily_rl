@@ -6,10 +6,13 @@ import threading
 from queue import Queue
 from typing import Dict, Any, Optional
 from datetime import datetime
+<<<<<<< HEAD
 import pytz
 
 # Indian Standard Time (IST) - Asia/Kolkata
 IST = pytz.timezone("Asia/Kolkata")
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 import db
 import rl_agent
 
@@ -23,7 +26,11 @@ class Job:
         self.job_type = job_type  # "reward_calculation" or "rl_update"
         self.job_id = job_id
         self.payload = payload
+<<<<<<< HEAD
         self.created_at = datetime.now(IST)
+=======
+        self.created_at = datetime.utcnow()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         self.status = "queued"
 
 async def process_reward_calculation_job(job: Job) -> Dict[str, Any]:
@@ -219,6 +226,9 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get status of a job"""
     return job_results.get(job_id)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 # Start worker when module is imported
 start_job_worker()

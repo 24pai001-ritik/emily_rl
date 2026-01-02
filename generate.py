@@ -1,14 +1,21 @@
 # generate.py
 
 from rl_agent import select_action
+<<<<<<< HEAD
 from prompt_template import TOPIC_GENERATOR,PROMPT_GENERATOR, TRENDY_TOPIC_PROMPT, classify_trend_style
+=======
+from prompt_template import PROMPT_GENERATOR, TRENDY_TOPIC_PROMPT, classify_trend_style
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 import json
 import os
 import requests
 from dotenv import load_dotenv
+<<<<<<< HEAD
 from sentence_transformers import SentenceTransformer
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 
 load_dotenv()
@@ -45,6 +52,7 @@ def call_gpt_4o_mini(prompt: str) -> dict:
         raise ValueError("GPT-4o mini did not return valid JSON")
 
 
+<<<<<<< HEAD
 def call_grok(prompt: str) -> str | dict:
     """
     Grok HTTP client.
@@ -56,12 +64,21 @@ def call_grok(prompt: str) -> str | dict:
     GROK_API_KEY = os.getenv("GROK_API_KEY")
     GROK_API_URL = os.getenv("GROK_API_URL")
 
+=======
+def call_grok(prompt: str):
+    """
+    Calls Grok via HTTP.
+    Returns JSON if possible, else raw text.
+    """
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     if not GROK_API_KEY:
         raise ValueError("GROK_API_KEY not found in environment variables")
 
     if not GROK_API_URL:
         raise ValueError("GROK_API_URL not found in environment variables")
 
+<<<<<<< HEAD
     try:
         response = requests.post(
             GROK_API_URL,
@@ -98,10 +115,43 @@ def call_grok(prompt: str) -> str | dict:
 
 
 
+=======
+    response = requests.post(
+        GROK_API_URL,
+        headers={
+            "Authorization": f"Bearer {GROK_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "grok-2",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        },
+        timeout=30
+    )
+
+    response.raise_for_status()
+
+    content = response.json()["choices"][0]["message"]["content"]
+
+    # Try JSON parse (for prompt generation)
+    try:
+        return json.loads(content)
+    except Exception:
+        # For topic generation (plain text)
+        return content
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 # ============================================================
 # TOPIC GENERATOR
 # ============================================================
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 def generate_topic(
     business_context: str,
     platform: str,
@@ -115,12 +165,17 @@ def generate_topic(
       "reasoning": str
     }
     """
+<<<<<<< HEAD
     print(f"Business context: {business_context}")
+=======
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     filled_prompt = TOPIC_GENERATOR
     filled_prompt = filled_prompt.replace("{{BUSINESS_CONTEXT}}", business_context)
     filled_prompt = filled_prompt.replace("{{PLATFORM}}", platform)
     filled_prompt = filled_prompt.replace("{{DATE}}", date)
 
+<<<<<<< HEAD
     try:
         response = call_grok(filled_prompt)
         return {
@@ -147,6 +202,43 @@ def embed_topic(topic_text: str):
 
 # ============================================================
 # CONTEXT BUILDER 
+=======
+    response = call_grok(filled_prompt)
+
+    # Grok returns formatted text, not JSON here
+    if not isinstance(response, str):
+        raise ValueError("Topic generator must return text")
+
+    # Expected format:
+    # **Topic:** XYZ
+    # <paragraph>
+
+    lines = response.strip().splitlines()
+
+    topic = None
+    reasoning = []
+
+    for line in lines:
+        if line.strip().startswith("**topic:**"):
+            topic = line.replace("**Topic:**", "").strip()
+        else:
+            reasoning.append(line.strip())
+
+    if not topic:
+        raise ValueError("Failed to extract topic from Grok response")
+
+    return {
+        "topic": topic,
+        "reasoning": " ".join(reasoning).strip()
+    }
+
+
+
+
+
+# ============================================================
+# CONTEXT BUILDER (UNCHANGED)
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 # ============================================================
 
 def build_context(business_embedding, topic_embedding, platform, time, day_of_week):
@@ -173,9 +265,13 @@ def generate_prompts(
     topic_embedding,
     platform: str,
     time: str,
+<<<<<<< HEAD
     day_of_week: int,
     topic_text: str,profile_data: dict,
     business_context: str
+=======
+    day_of_week: int
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 ) -> dict:
     """
     Single execution point between RL and LLMs.
@@ -193,8 +289,12 @@ def generate_prompts(
     )
 
     # 2️⃣ RL decides creative controls
+<<<<<<< HEAD
     action, ctx_vec = select_action(context) 
     
+=======
+    action, ctx_vec = select_action(context)
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     print(f"🎯 RL Selected Action: {action}")
     hook_type = action.get("HOOK_TYPE", "")
 
@@ -210,6 +310,7 @@ def generate_prompts(
             inputs["INDUSTRIES"]
         )
 
+<<<<<<< HEAD
         # Format business context as structured JSON-like data for better prompt understanding
         business_context_formatted = f"""
 Business Name: {profile_data.get('business_name', 'Business')}
@@ -232,6 +333,12 @@ Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
             "BUSINESS_TYPES": profile_data["business_types"],
             "INDUSTRIES": profile_data["industries"],
             "topic_text": topic_text
+=======
+        filled_prompt = TRENDY_TOPIC_PROMPT
+        merged_with_style = {
+            **merged,
+            "selected_style": selected_style
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         }
 
         for k, v in merged_with_style.items():
@@ -241,6 +348,7 @@ Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
 
         print(f"📝 Sending to Grok (Trendy Topic): {filled_prompt[:200]}...")
         llm_response = call_grok(filled_prompt)
+<<<<<<< HEAD
 
         if not isinstance(llm_response, dict):
             print("⚠️ Grok returned non-JSON output. Raw response:")
@@ -252,12 +360,19 @@ Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
 
         print(f"📝 Generated Caption Prompt: {llm_response['caption_prompt']}\n")
         print(f"📝 Generated Image Prompt: {llm_response['image_prompt']}\n")
+=======
+        print(f"📝 Generated Caption Prompt: {llm_response['caption_prompt'][:200]}...")
+        print(f"📝 Generated Image Prompt: {llm_response['image_prompt'][:200]}...")
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
         return {
             "mode": "trendy",
             "caption_prompt": llm_response["caption_prompt"],
             "image_prompt": llm_response["image_prompt"],
+<<<<<<< HEAD
             "business_context_formatted": business_context_formatted,
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
             "style": selected_style,
             "action": action,
             "context": context,
@@ -269,6 +384,7 @@ Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
     # ✅ NON-TRENDY → GPT-4o MINI
     # =====================================================
     filled_prompt = PROMPT_GENERATOR
+<<<<<<< HEAD
 
     # Format business context as structured JSON-like data for better prompt understanding
     business_context_formatted = f"""
@@ -293,21 +409,33 @@ Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
     "topic_text": topic_text
 }
 
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     for k, v in merged.items():
         if isinstance(v, list):
             v = ", ".join(v)
         filled_prompt = filled_prompt.replace(f"{{{{{k}}}}}", str(v))
 
+<<<<<<< HEAD
     print(f"📝 Sending to GPT-4o-mini (Standard)")
     llm_response = call_gpt_4o_mini(filled_prompt)
     print(f"📝 Generated Caption Prompt: {llm_response['caption_prompt'][:180]}...")
     print(f"📝 Generated Image Prompt: {llm_response['image_prompt'][:180]}...")
+=======
+    print(f"📝 Sending to GPT-4o-mini (Standard): {filled_prompt[:200]}...")
+    llm_response = call_gpt_4o_mini(filled_prompt)
+    print(f"📝 Generated Caption Prompt: {llm_response['caption_prompt'][:200]}...")
+    print(f"📝 Generated Image Prompt: {llm_response['image_prompt'][:200]}...")
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
     return {
         "mode": "standard",
         "caption_prompt": llm_response["caption_prompt"],
         "image_prompt": llm_response["image_prompt"],
+<<<<<<< HEAD
         "business_context_formatted": business_context_formatted,
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         "action": action,
         "context": context,
         "ctx_vec": ctx_vec

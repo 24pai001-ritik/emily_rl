@@ -24,6 +24,7 @@ create table post_contents (
   generated_image_url text,
 
   -- lifecycle
+<<<<<<< HEAD
   status text default 'generated',
   -- generated | posted | failed | deleted
   media_id text,
@@ -32,6 +33,10 @@ create table post_contents (
   -- scheduling
   post_date date,
   post_time time,
+=======
+  status text default 'generated', 
+  -- generated | posted | failed | deleted
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
   posted_at timestamp with time zone,
   created_at timestamp with time zone default now()

@@ -114,4 +114,8 @@ def update_rl(context, action, ctx_vec, reward, baseline,
         theta[(dim, val)] += theta_update
         print(f"   📈 Theta update magnitude: {np.linalg.norm(theta_update):.6f}")
 
+<<<<<<< HEAD
+=======
+#---Computing Reward---
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 

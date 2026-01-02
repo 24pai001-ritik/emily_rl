@@ -44,7 +44,11 @@ INPUTS (ONE VALUE EACH, ALWAYS PROVIDED)
 
 business context  : {{BUSINESS_CONTEXT}}
 
+<<<<<<< HEAD
 Topic : {{topic_text}}
+=======
+Topic : {{topic_embedding}}
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 Hook type: {{HOOK_TYPE}}
 Length : {{LENGTH}}
@@ -97,7 +101,11 @@ CAPTION REQUIREMENTS (STRICT)
 
 The caption_prompt MUST instruct the model to:
 
+<<<<<<< HEAD
 - Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{topic_text}}
+=======
+- Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{topic_embedding}}
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 - Follow all creative controls strictly
 - Include relevant, platform-appropriate hashtags
 - STRICTLY include the hashtag: #workvillage
@@ -162,6 +170,7 @@ Your job ends immediately after producing the two prompts."""
 
 
 
+<<<<<<< HEAD
 TRENDY_TOPIC_PROMPT = """
 
 IMPORTANT:
@@ -170,6 +179,9 @@ If you cannot, return:
 {"caption_prompt":"", "image_prompt":""}
 
 You are a Prompt Generator.
+=======
+TRENDY_TOPIC_PROMPT = """You are a Prompt Generator.
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 Your task is to generate EXACTLY TWO FINAL PROMPTS from the given inputs:
 1) A CAPTION GENERATION PROMPT for GPT-4o mini
@@ -190,7 +202,11 @@ INPUTS (ONE VALUE EACH, ALWAYS PROVIDED)
 
 business context  : {{BUSINESS_CONTEXT}}
 
+<<<<<<< HEAD
 Topic : {{topic_text}}
+=======
+Topic : {{topic_embedding}}
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 Hook type: {{HOOK_TYPE}}
 Length : {{LENGTH}}
@@ -248,7 +264,11 @@ CAPTION REQUIREMENTS (STRICT)
 
 The caption_prompt MUST instruct the model to:
 
+<<<<<<< HEAD
 - Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{topic_text}}
+=======
+- Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{topic_embedding}}
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 - Follow all creative controls strictly
 - Follow {selected_style} exactly
 - Include relevant, platform-appropriate hashtags

@@ -11,13 +11,18 @@ Flow:
 6. Compute reward
 7. Update RL
 """
+<<<<<<< HEAD
 # from db import fetch_or_calculate_reward
+=======
+from db import fetch_or_calculate_reward
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 import uuid
 import time
 import random
 from datetime import datetime
 import numpy as np
+<<<<<<< HEAD
 import pytz
 
 # Indian Standard Time (IST) - Asia/Kolkata
@@ -29,13 +34,45 @@ import db
 from generate import generate_prompts,embed_topic,generate_topic
 from job_queue import queue_reward_calculation_job, start_job_worker
 from content_generation import generate_content
+=======
+#from campaign import topic,date,time,platform
+
+import db
+from rl_agent import update_rl
+from generate import generate_prompts
+from job_queue import queue_reward_calculation_job
+
+# -------------------------------------------------
+# CONFIG
+# -------------------------------------------------
+ 
+PLATFORM = "instagram"
+BUSINESS_ID = "7648103e-81be-4fd9-b573-8e72e2fcbe5d"
+
+
+# -------------------------------------------------
+# SIMPLE HELPERS (later replace with real systems)
+# -------------------------------------------------
+
+# make campaign topic selection
+
+# def decide_post_type() -> str:
+    # return "educational post"
+
+
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 
 # -------------------------------------------------
 # MAIN LOOP
 # -------------------------------------------------
 
+<<<<<<< HEAD
 def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
+=======
+def run_one_post(topic_embedding, platform, time=None, day_of_week=None):
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     # Get user's scheduling preferences if not provided
     if time is None or day_of_week is None:
         scheduling_prefs = db.get_profile_scheduling_prefs(BUSINESS_ID)
@@ -43,16 +80,25 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         day_of_week = day_of_week if day_of_week is not None else scheduling_prefs["day_of_week"]
 
     print(f"\n🚀 Starting new post cycle for {platform} at {time} (day {day_of_week})")
+<<<<<<< HEAD
     
     date = datetime.now(IST).date().isoformat()
 
 
     # ---------- 1️⃣ BUSINESS CONTEXT ----------
 
+=======
+
+    # ---------- 1️⃣ BUSINESS CONTEXT ----------
+
+
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     # Get business embedding and profile data from profiles table
     business_embedding = db.get_profile_embedding_with_fallback(BUSINESS_ID)
     profile_data = db.get_profile_business_data(BUSINESS_ID)
 
+<<<<<<< HEAD
     #generate topic
     topic_data = generate_topic(
     business_context=str(profile_data),
@@ -71,10 +117,21 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
 
     # ---------- 2️⃣ GENERATE PROMPTS (RL INSIDE) ----------
     inputs = {
+=======
+    # ---------- 2️⃣ GENERATE PROMPTS (RL INSIDE) ----------
+    inputs = {
+        "BUSINESS_CONTEXT": business_embedding,
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         "BUSINESS_AESTHETIC": profile_data["brand_voice"],  # Use brand voice as aesthetic
         "BUSINESS_TYPES": profile_data["business_types"],
         "INDUSTRIES": profile_data["industries"],
         "BUSINESS_DESCRIPTION": profile_data["business_description"],
+<<<<<<< HEAD
+=======
+        "TOPIC_EMBEDDING": topic_embedding,
+        "PLATFORM": platform,
+        "TIME": time
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     }
 
     result = generate_prompts(
@@ -83,9 +140,13 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         topic_embedding,
         platform,
         time,
+<<<<<<< HEAD
         day_of_week,
         topic_text,profile_data,
         business_context=profile_data,
+=======
+        day_of_week
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     )
 
     # Extract values based on mode
@@ -108,6 +169,7 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
     # ---------- 4️⃣ STORE POST CONTENT ----------
     # Extract prompts based on mode (handle both trendy and standard modes)
     image_prompt = result.get("image_prompt",
+<<<<<<< HEAD
         f"Create an image with {action['VISUAL_STYLE']} style, {action['TONE']} tone, {action['CREATIVITY']} creativity level.The topic is {topic_text}. Make it engaging for {platform}.")
 
     caption_prompt = result.get("caption_prompt",
@@ -139,12 +201,19 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         print(f"❌ Content generation failed: {content_result['error']}")
         generated_caption = None
         generated_image_url = None
+=======
+        f"Create an image with {action['VISUAL_STYLE']} style, {action['TONE']} tone, {action['CREATIVITY']} creativity level. Make it engaging for {platform}.")
+
+    caption_prompt = result.get("caption_prompt",
+        f"Write a {action['TONE']} caption in {action['LENGTH']} length with {action['CREATIVITY']} creativity level. Make it suitable for {platform}.")
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
     db.insert_post_content(
         post_id=post_id,
         action_id=action_id,
         platform=platform,
         business_id=BUSINESS_ID,
+<<<<<<< HEAD
         topic=topic_text,
         # business_context= profile_data["business_description"],
         # business_aesthetic=profile_data["brand_voice"],
@@ -154,6 +223,20 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
         generated_image_url=generated_image_url
     )
 
+=======
+        topic="topic_from_embedding",  # Placeholder since we're now using embeddings
+        post_type="educational",  # Default post type
+        business_context=str(business_embedding),  # Convert embedding to string
+        business_aesthetic="modern, professional, clean design",  # Default aesthetic
+        image_prompt=image_prompt,
+        caption_prompt=caption_prompt,
+        status="generated"
+    )
+
+    print("📝 Prompt generated and stored")
+    print("🎯 RL Action:", action)
+
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
     # ---------- 5️⃣ SIMULATE POSTING ----------
    
 
@@ -169,6 +252,7 @@ def run_one_post(BUSINESS_ID, platform, time=None, day_of_week=None):
 
     print("✅ Post cycle completed - RL learning will happen asynchronously")
 
+<<<<<<< HEAD
 # -------------------------------------------------
 # ENTRY POINT
 # -------------------------------------------------
@@ -209,3 +293,21 @@ if __name__ == "__main__":
             )
 
     print("\n✅ Daily post creation process completed for all businesses")
+=======
+
+# -------------------------------------------------
+# ENTRY POINT
+# -------------------------------------------------
+
+if __name__ == "__main__":
+    # Example usage: topic_embedding, platform, time=None, day_of_week=None
+    # If time/day_of_week not provided, uses user's profile preferences
+    import numpy as np
+    sample_topic_embedding = np.random.rand(384).astype("float32")  # Sample embedding
+
+    run_one_post(
+        topic_embedding=sample_topic_embedding,
+        platform="instagram",
+         # Thursday (0=Monday, 6=Sunday)
+    )
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5

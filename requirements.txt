@@ -1,9 +1,12 @@
 supabase>=2.0.0
 python-dotenv>=1.0.0
 numpy>=1.21.0
+<<<<<<< HEAD
 sentence-transformers>=2.2.0
 google-genai
 langchain-openai
 langchain-core
 requests
 pytz
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5

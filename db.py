@@ -1,12 +1,19 @@
 # db.py
 import os
 import math
+<<<<<<< HEAD
 import uuid
 import numpy as np
 from dotenv import load_dotenv
 from supabase import create_client
 from datetime import datetime, timedelta, timezone
 import pytz
+=======
+import numpy as np
+from dotenv import load_dotenv
+from supabase import create_client
+from datetime import datetime, timedelta
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,9 +27,12 @@ REWARD_WEIGHTS = {     # at alpha = 0.35
     168: 0.071
 }
 
+<<<<<<< HEAD
 # Indian Standard Time (IST) - Asia/Kolkata
 IST = pytz.timezone("Asia/Kolkata")
 
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
@@ -130,7 +140,11 @@ def update_preference(platform, time_bucket, day, dimension, value, delta):
                     supabase.table("rl_preferences").update({
                         "preference_score": new_score,
                         "num_samples": current_samples + 1,
+<<<<<<< HEAD
                         "updated_at": datetime.now(IST).isoformat()
+=======
+                        "updated_at": datetime.utcnow().isoformat()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
                     }).eq("id", row["id"]).execute()
                     return  # Success
             else:
@@ -171,6 +185,7 @@ def insert_post_content(
     platform,
     business_id,
     topic,
+<<<<<<< HEAD
     image_prompt,
     caption_prompt,
     generated_caption,
@@ -193,28 +208,58 @@ def insert_post_content(
         post_date = datetime.now(IST).date().isoformat()
         post_time = time_mapping.get(time_bucket, "18:30:00")  # Default to evening
 
+=======
+    post_type,
+    business_context,
+    business_aesthetic,
+    image_prompt,
+    caption_prompt,
+    generated_caption=None,
+    generated_image_url=None,
+    status="generated"
+):
+    try:
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         supabase.table("post_contents").insert({
             "post_id": post_id,
             "action_id": action_id,
             "platform": platform,
             "business_id": business_id,
             "topic": topic,
+<<<<<<< HEAD
+=======
+            "post_type": post_type,
+            "business_context": business_context,
+            "business_aesthetic": business_aesthetic,
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
             "image_prompt": image_prompt,
             "caption_prompt": caption_prompt,
             "generated_caption": generated_caption,
             "generated_image_url": generated_image_url,
+<<<<<<< HEAD
             "post_date": post_date,
             "post_time": post_time
 
+=======
+            "status": status
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         }).execute()
     except Exception as e:
         print(f"Error inserting post content for post_id {post_id}: {e}")
         raise
+<<<<<<< HEAD
         
 def mark_post_as_posted(post_id):
     try:
         supabase.table("post_contents").update({
             "status": "posted"
+=======
+def mark_post_as_posted(post_id):
+    try:
+        supabase.table("post_contents").update({
+            "status": "posted",
+            "posted_at": datetime.utcnow().isoformat()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         }).eq("post_id", post_id).execute()
     except Exception as e:
         print(f"Error marking post {post_id} as posted: {e}")
@@ -224,7 +269,11 @@ def create_post_reward_record(profile_id, post_id, platform, action_id=None):
     """Create initial post reward record when post is published"""
     try:
         # Set post_created_at to now and eligible_at to 24 hours from now
+<<<<<<< HEAD
         post_created_at = datetime.now(IST)
+=======
+        post_created_at = datetime.utcnow()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         eligible_at = post_created_at + timedelta(hours=24)
 
         reward_data = {
@@ -290,7 +339,11 @@ def insert_post_snapshot(post_id, platform, metrics, profile_id=None, timeslot_h
             "post_id": post_id,
             "platform": platform,
             "timeslot_hours": timeslot_hours,
+<<<<<<< HEAD
             "snapshot_at": datetime.now(IST).isoformat(),
+=======
+            "snapshot_at": datetime.utcnow().isoformat(),
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
             **processed_metrics
         }
 
@@ -399,7 +452,11 @@ def get_profile_business_data(profile_id):
     """Fetch business-related data from profiles table"""
     try:
         res = supabase.table("profiles").select(
+<<<<<<< HEAD
             "business_name, business_type, industry, business_description, brand_voice, brand_tone, target_audience, unique_value_proposition, customer_pain_points, primary_color, secondary_color"
+=======
+            "business_name, business_type, industry, business_description, brand_voice, brand_tone"
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         ).eq("id", profile_id).execute()
 
         if res.data and len(res.data) > 0:
@@ -461,6 +518,7 @@ def get_profile_scheduling_prefs(profile_id):
         }
 
 
+<<<<<<< HEAD
 def get_today_day_of_week_ist():
     """
     Returns today's day_of_week in IST.
@@ -511,6 +569,8 @@ def should_create_post_today(profile_id) -> bool:
     return today_day == profile_day
 
 
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
 def get_post_metrics(post_id, platform):
     """Fetch real metrics for a post from database"""
     try:
@@ -577,7 +637,11 @@ def calculate_reward_from_snapshots(snapshots: list, platform: str, post_id: str
                     # Calculate days since post creation for penalty scaling
                     if post_data.get("created_at"):
                         created_at = datetime.fromisoformat(post_data["created_at"].replace('Z', '+00:00'))
+<<<<<<< HEAD
                         current_time = datetime.now(IST).replace(tzinfo=None)
+=======
+                        current_time = datetime.utcnow()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
                         if created_at.tzinfo is not None:
                             created_at = created_at.replace(tzinfo=None)
                         days_since_post = (current_time - created_at).days
@@ -662,7 +726,11 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
                 if eligible_dt.tzinfo is not None:
                     eligible_dt = eligible_dt.replace(tzinfo=None)
 
+<<<<<<< HEAD
                 current_dt = datetime.now(IST).replace(tzinfo=None)
+=======
+                current_dt = datetime.utcnow()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
                 if current_dt < eligible_dt:
                     print(f"   ⏳ Reward not yet eligible (eligible at: {eligible_at})")
                     return {
@@ -696,7 +764,11 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
         supabase.table("post_rewards").update({
             "reward_status": "calculated",
             "reward_value": reward_value,
+<<<<<<< HEAD
             "calculated_at": datetime.now(IST).isoformat()
+=======
+            "calculated_at": datetime.utcnow().isoformat()
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
         }).eq("id", reward_row["id"]).execute()
 
         # Also store final reward in rl_rewards table
@@ -741,6 +813,7 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
         "status": "calculated",
         "reward": reward_value
     }
+<<<<<<< HEAD
 
 
 def get_connected_platforms(business_id):
@@ -957,3 +1030,5 @@ class SupabaseImageManager:
         # Decode base64 to bytes
         image_bytes = base64.b64decode(b64_string)
         return self.save_image(image_bytes, filename, folder)
+=======
+>>>>>>> 1da14f9b985884c988152cd658d6fac1637e6ce5
