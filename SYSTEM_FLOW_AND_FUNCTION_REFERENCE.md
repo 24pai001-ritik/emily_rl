@@ -46,7 +46,7 @@ The system implements a contextual bandit RL approach with:
 
 6. SIMULATED POSTING
    ↓ post_id → db.mark_post_as_posted()
-   ↓ status → "posted", posted_at timestamp
+   ↓ status remains "generated" (until media_id provided), posted_at timestamp set
 
 7. REWARD RECORD CREATION
    ↓ BUSINESS_ID, post_id → db.create_post_reward_record()
@@ -97,7 +97,7 @@ DATA FLOW SUMMARY:
 | `get_profile_business_data` | db.py | Gets business profile data | main.py | No | Yes | Supportive - data loading |
 | `insert_action` | db.py | Stores RL action record | main.py | Yes | No | Core - data persistence |
 | `insert_post_content` | db.py | Stores generated content | main.py | Yes | No | Core - data persistence |
-| `mark_post_as_posted` | db.py | Updates post status to posted | main.py | Yes | No | Supportive - status management |
+| `mark_post_as_posted` | db.py | Updates post status to posted only when media_id provided | main.py | Yes | No | Supportive - status management |
 | `create_post_reward_record` | db.py | Creates pending reward record | main.py | Yes | No | Core - reward initialization |
 | `get_post_reward` | db.py | Retrieves reward record | db.py | No | Yes | Supportive - reward checking |
 | `get_post_snapshots` | db.py | Gets engagement snapshots | db.py | No | Yes | Supportive - data aggregation |

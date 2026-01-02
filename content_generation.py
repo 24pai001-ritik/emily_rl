@@ -113,6 +113,10 @@ class ContentGenerator:
         if not self.gemini_client:
             raise ValueError("Gemini API key not configured")
 
+        # Warn if {{CAPTION}} placeholder is found (should be replaced before calling this)
+        if "{{CAPTION}}" in image_prompt:
+            print("⚠️  WARNING: {{CAPTION}} placeholder found in image prompt. Use generate_content() instead of generate_image() directly.")
+
         try:
             if USE_NEW_PACKAGE:
                 # New google.genai package API
@@ -195,19 +199,33 @@ class ContentGenerator:
             print(f"Warning: Image generation failed ({e}), using placeholder")
             return f"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 
-    def generate_content(self, caption_prompt: str, image_prompt: str) -> Dict[str, Any]:
+    def generate_content(self, caption_prompt: str, image_prompt: str, business_context: Dict = None) -> Dict[str, Any]:
         """
         Generate both caption and image from their respective prompts.
 
         Args:
             caption_prompt: Prompt for caption generation
-            image_prompt: Prompt for image generation
+            image_prompt: Prompt for image generation (should already have business context integrated)
+            business_context: Optional dict with business data - DEPRECATED, business context should be in image_prompt
 
         Returns:
             Dict with 'caption' and 'image_url' keys
         """
         try:
             caption = self.generate_caption(caption_prompt)
+
+            # Replace {{CAPTION}} placeholder in image_prompt with actual generated caption
+            if caption and "{{CAPTION}}" in image_prompt:
+                image_prompt = image_prompt.replace("{{CAPTION}}", caption)
+                print(f"🔄 Replaced {{CAPTION}} placeholder in image prompt")
+
+            # NOTE: Business context should already be integrated into image_prompt via template placeholders
+            # during prompt generation. No need to append here as it creates duplication.
+
+            # Warn if business_context is still being passed (deprecated usage)
+            if business_context:
+                print("⚠️  WARNING: business_context parameter is deprecated. Business context should be integrated into image_prompt during prompt generation.")
+
             image_url = self.generate_image(image_prompt)
 
             return {
@@ -236,10 +254,10 @@ def generate_image(image_prompt: str) -> str:
     return generator.generate_image(image_prompt)
 
 
-def generate_content(caption_prompt: str, image_prompt: str) -> Dict[str, Any]:
+def generate_content(caption_prompt: str, image_prompt: str, business_context: Dict = None) -> Dict[str, Any]:
     """Generate both caption and image from their prompts."""
     generator = ContentGenerator()
-    return generator.generate_content(caption_prompt, image_prompt)
+    return generator.generate_content(caption_prompt, image_prompt, business_context)
 
 
 if __name__ == "__main__":

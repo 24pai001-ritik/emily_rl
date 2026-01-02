@@ -177,6 +177,22 @@ def insert_post_content(
     generated_image_url
 ):
     try:
+        # Get scheduling preferences for the business
+        scheduling_prefs = get_profile_scheduling_prefs(business_id)
+        time_bucket = scheduling_prefs.get("time_bucket", "evening")
+
+        # Map time_bucket to IST times
+        time_mapping = {
+            "morning": "08:30:00",
+            "afternoon": "13:00:00",
+            "evening": "18:30:00",
+            "night": "21:30:00"
+        }
+
+        # Get today's date and scheduled time
+        post_date = datetime.now(IST).date().isoformat()
+        post_time = time_mapping.get(time_bucket, "18:30:00")  # Default to evening
+
         supabase.table("post_contents").insert({
             "post_id": post_id,
             "action_id": action_id,
@@ -186,8 +202,10 @@ def insert_post_content(
             "image_prompt": image_prompt,
             "caption_prompt": caption_prompt,
             "generated_caption": generated_caption,
-            "generated_image_url": generated_image_url
-            
+            "generated_image_url": generated_image_url,
+            "post_date": post_date,
+            "post_time": post_time
+
         }).execute()
     except Exception as e:
         print(f"Error inserting post content for post_id {post_id}: {e}")
@@ -196,8 +214,7 @@ def insert_post_content(
 def mark_post_as_posted(post_id):
     try:
         supabase.table("post_contents").update({
-            "status": "posted",
-            "posted_at": datetime.now(IST).isoformat()
+            "status": "posted"
         }).eq("post_id", post_id).execute()
     except Exception as e:
         print(f"Error marking post {post_id} as posted: {e}")
@@ -560,7 +577,7 @@ def calculate_reward_from_snapshots(snapshots: list, platform: str, post_id: str
                     # Calculate days since post creation for penalty scaling
                     if post_data.get("created_at"):
                         created_at = datetime.fromisoformat(post_data["created_at"].replace('Z', '+00:00'))
-                        current_time = datetime.now(IST)
+                        current_time = datetime.now(IST).replace(tzinfo=None)
                         if created_at.tzinfo is not None:
                             created_at = created_at.replace(tzinfo=None)
                         days_since_post = (current_time - created_at).days
@@ -645,7 +662,7 @@ def fetch_or_calculate_reward(profile_id: str, post_id: str, platform: str):
                 if eligible_dt.tzinfo is not None:
                     eligible_dt = eligible_dt.replace(tzinfo=None)
 
-                current_dt = datetime.now(IST)
+                current_dt = datetime.now(IST).replace(tzinfo=None)
                 if current_dt < eligible_dt:
                     print(f"   ⏳ Reward not yet eligible (eligible at: {eligible_at})")
                     return {

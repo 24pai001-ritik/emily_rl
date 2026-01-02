@@ -24,8 +24,14 @@ create table post_contents (
   generated_image_url text,
 
   -- lifecycle
-  status text default 'generated', 
+  status text default 'generated',
   -- generated | posted | failed | deleted
+  media_id text,
+  -- Social media platform's post/media ID when published
+
+  -- scheduling
+  post_date date,
+  post_time time,
 
   posted_at timestamp with time zone,
   created_at timestamp with time zone default now()

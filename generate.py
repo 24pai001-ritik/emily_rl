@@ -210,11 +210,24 @@ def generate_prompts(
             inputs["INDUSTRIES"]
         )
 
+        # Format business context as structured JSON-like data for better prompt understanding
+        business_context_formatted = f"""
+Business Name: {profile_data.get('business_name', 'Business')}
+Industry: {', '.join(profile_data.get('industries', ['General']))}
+Business Type: {', '.join(profile_data.get('business_types', ['General']))}
+Description: {profile_data.get('business_description', 'A business focused on growth and success')}
+Brand Voice: {profile_data.get('brand_voice', 'Professional and approachable')}
+Target Audience: {profile_data.get('target_audience', 'General audience')}
+Unique Value Proposition: {profile_data.get('unique_value_proposition', 'Delivering quality solutions')}
+Primary Color: {profile_data.get('primary_color', '#000000')}
+Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
+"""
+
         filled_prompt = TRENDY_TOPIC_PROMPT
         merged_with_style = {
             **merged,
             "selected_style": selected_style,
-            "BUSINESS_CONTEXT": business_context,
+            "BUSINESS_CONTEXT": business_context_formatted,
             "BUSINESS_AESTHETIC": profile_data["brand_voice"],
             "BUSINESS_TYPES": profile_data["business_types"],
             "INDUSTRIES": profile_data["industries"],
@@ -244,6 +257,7 @@ def generate_prompts(
             "mode": "trendy",
             "caption_prompt": llm_response["caption_prompt"],
             "image_prompt": llm_response["image_prompt"],
+            "business_context_formatted": business_context_formatted,
             "style": selected_style,
             "action": action,
             "context": context,
@@ -255,10 +269,24 @@ def generate_prompts(
     # ✅ NON-TRENDY → GPT-4o MINI
     # =====================================================
     filled_prompt = PROMPT_GENERATOR
+
+    # Format business context as structured JSON-like data for better prompt understanding
+    business_context_formatted = f"""
+Business Name: {profile_data.get('business_name', 'Business')}
+Industry: {', '.join(profile_data.get('industries', ['General']))}
+Business Type: {', '.join(profile_data.get('business_types', ['General']))}
+Description: {profile_data.get('business_description', 'A business focused on growth and success')}
+Brand Voice: {profile_data.get('brand_voice', 'Professional and approachable')}
+Target Audience: {profile_data.get('target_audience', 'General audience')}
+Unique Value Proposition: {profile_data.get('unique_value_proposition', 'Delivering quality solutions')}
+Primary Color: {profile_data.get('primary_color', '#000000')}
+Secondary Color: {profile_data.get('secondary_color', '#FFFFFF')}
+"""
+
     merged = {
     **inputs,
     **action,
-    "BUSINESS_CONTEXT": business_context,
+    "BUSINESS_CONTEXT": business_context_formatted,
     "BUSINESS_AESTHETIC": profile_data["brand_voice"],
     "BUSINESS_TYPES": profile_data["business_types"],
     "INDUSTRIES": profile_data["industries"],
@@ -279,6 +307,7 @@ def generate_prompts(
         "mode": "standard",
         "caption_prompt": llm_response["caption_prompt"],
         "image_prompt": llm_response["image_prompt"],
+        "business_context_formatted": business_context_formatted,
         "action": action,
         "context": context,
         "ctx_vec": ctx_vec
