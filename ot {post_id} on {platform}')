@@ -1,0 +1,151 @@
+[1mdiff --git a/generate.py b/generate.py[m
+[1mindex 035c7ff..c21d2ce 100644[m
+[1m--- a/generate.py[m
+[1m+++ b/generate.py[m
+[36m@@ -10,55 +10,120 @@[m [mfrom rl_agent import select_action[m
+ PROMPT_TEMPLATE = """[m
+ You are a Prompt Generator.[m
+ [m
+[31m-Your task is to generate TWO FINAL PROMPTS from the given inputs:[m
+[31m-1) An IMAGE GENERATION PROMPT for Gemini[m
+[31m-2) A CAPTION GENERATION PROMPT for GPT-4o mini[m
+[32m+[m[32mYour task is to generate EXACTLY TWO FINAL PROMPTS from the given inputs:[m
+[32m+[m[32m1) A CAPTION GENERATION PROMPT for GPT-4o mini[m
+[32m+[m[32m2) AN IMAGE GENERATION PROMPT for Gemini[m
+ [m
+[31m-You must NOT generate the image or the caption yourself.[m
+[32m+[m[32mYou must NOT generate the caption or the image yourself.[m
+ You must ONLY generate the prompts that will later be sent to those models.[m
+ [m
+[32m+[m[32mIMPORTANT ORDERING RULE:[m
+[32m+[m[32m• The caption is generated FIRST[m
+[32m+[m[32m• The image prompt MUST use BOTH the generated caption AND the business context as references[m
+[32m+[m[32m• The image prompt MUST reference the caption using the placeholder {{CAPTION}}[m
+[32m+[m
+ ────────────────────────────────[m
+ INPUTS (ONE VALUE EACH, ALWAYS PROVIDED)[m
+ ────────────────────────────────[m
+ [m
+[31m-{{BUSINESS_CONTEXT}}[m
+[31m-{{BUSINESS_AESTHETIC}}[m
+[32m+[m[32mbusiness context  : {{BUSINESS_CONTEXT}}[m
+ [m
+[31m-{{TOPIC}}[m
+[32m+[m[32mTopic : {{TOPIC}}[m
+ [m
+[31m-{{HOOK_TYPE}}[m
+[31m-{{LENGTH}}[m
+[31m-{{TONE}}[m
+[31m-{{CREATIVITY}}[m
+[32m+[m[32mHook type: {{HOOK_TYPE}}[m
+[32m+[m[32mLength : {{LENGTH}}[m
+[32m+[m[32mTone: {{TONE}}[m
+[32m+[m[32mCreativity : {{CREATIVITY}}[m
+ [m
+[31m-{{TEXT_IN_IMAGE}}[m
+[31m-{{VISUAL_STYLE}}[m
+[32m+[m[32mText in image : {{TEXT_IN_IMAGE}}[m
+[32m+[m[32mVisual style : {{VISUAL_STYLE}}[m
+ [m
+ ────────────────────────────────[m
+[31m-OUTPUT REQUIREMENTS[m
+[32m+[m[32mCREATIVE INTERPRETATION (STRICT)[m
+ ────────────────────────────────[m
+ [m
+[31m-Return a JSON object with exactly TWO keys:[m
+[32m+[m[32m• LENGTH[m
+[32m+[m[32m  - short → punchy, minimal, scroll-stopping[m
+[32m+[m[32m  - medium → concise but slightly explanatory[m
+[32m+[m
+[32m+[m[32m• TONE[m
+[32m+[m[32m  - casual → friendly, conversational[m
+[32m+[m[32m  - formal → professional, composed[m
+[32m+[m[32m  - humorous → light, witty, brand-safe[m
+[32m+[m[32m  - educational → clear, informative, structured[m
+[32m+[m
+[32m+[m[32m• CREATIVITY[m
+[32m+[m[32m  - safe → literal, conservative, low-risk[m
+[32m+[m[32m  - balanced → clever but controlled[m
+[32m+[m[32m  - experimental → bold phrasing, novel metaphors, still brand-safe[m
+[32m+[m
+[32m+[m[32m• TEXT_IN_IMAGE[m
+[32m+[m[32m  - "text in image" → include ONLY a short headline-style phrase[m
+[32m+[m[32m  - "no text in image" → visual-only, no written words[m
+[32m+[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m[32mCAPTION REQUIREMENTS (STRICT)[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m
+[32m+[m[32mThe caption_prompt MUST instruct the model to:[m
+[32m+[m
+[32m+[m[32m- Write a caption aligned with {{BUSINESS_CONTEXT}}, {{BUSINESS_AESTHETIC}}, and {{TOPIC}}[m
+[32m+[m[32m- Follow all creative controls strictly[m
+[32m+[m[32m- Include relevant, platform-appropriate hashtags[m
+[32m+[m[32m- STRICTLY include the hashtag: #workvillage[m
+[32m+[m[32m- Place hashtags naturally at the end of the caption[m
+[32m+[m[32m- Avoid spammy, generic, or misleading hashtags[m
+[32m+[m[32m- Do NOT invent brand claims, metrics, or features[m
+[32m+[m[32m- Do NOT include emojis unless TONE is casual or humorous[m
+[32m+[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m[32mIMAGE PROMPT REQUIREMENTS (STRICT)[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m
+[32m+[m[32mThe image_prompt MUST instruct the model to:[m
+[32m+[m
+[32m+[m[32m- Use {{CAPTION}} as the PRIMARY semantic reference for the visual[m
+[32m+[m[32m- Use {{BUSINESS_CONTEXT}} as a SECONDARY reference to ensure:[m
+[32m+[m[32m  • industry relevance[m[41m  [m
+[32m+[m[32m  • brand appropriateness[m[41m  [m
+[32m+[m[32m  • compliance with the business domain[m
+[32m+[m[32m- Use {{BUSINESS_AESTHETIC}} to guide colors, mood, and visual language[m
+[32m+[m[32m- Translate the intent, emotion, and message of {{CAPTION}} into a visual concept[m
+[32m+[m[32m- Respect {{TEXT_IN_IMAGE}} rules strictly[m
+[32m+[m[32m- Align with {{VISUAL_STYLE}}[m
+[32m+[m[32m- NOT repeat the full caption verbatim inside the image[m
+[32m+[m[32m- NOT introduce concepts, symbols, or claims that are not supported by {{CAPTION}} or {{BUSINESS_CONTEXT}}[m
+[32m+[m[32m- NOT visually depict business details unless clearly implied by {{CAPTION}}[m
+[32m+[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m[32mOUTPUT REQUIREMENTS (NON-NEGOTIABLE)[m
+[32m+[m[32m────────────────────────────────[m
+[32m+[m
+[32m+[m[32mReturn a VALID JSON object with EXACTLY TWO keys:[m
+ [m
+ {[m
+[31m-  "image_prompt": "...",[m
+[31m-  "caption_prompt": "..."[m
+[32m+[m[32m  "caption_prompt": "...",[m
+[32m+[m[32m  "image_prompt": "..."[m
+ }[m
+ [m
+[31m-Do NOT add any extra text, explanations, or markdown.[m
+[31m-Do NOT include the JSON keys inside the prompts themselves.[m
+[32m+[m[32m• Do NOT add extra keys[m
+[32m+[m[32m• Do NOT add explanations, markdown, or comments[m
+[32m+[m[32m• Do NOT include the JSON keys inside the prompt text[m
+[32m+[m[32m• Output must be machine-parseable JSON only[m
+ [m
+ ────────────────────────────────[m
+[31m-IMPORTANT CONSTRAINTS[m
+[32m+[m[32mCRITICAL CONSTRAINTS[m
+ ────────────────────────────────[m
+ [m
+[31m-- You are a generator, not a creator[m
+[31m-- Do NOT improvise new variables[m
+[31m-- Do NOT change or reinterpret input values[m
+[31m-- Do NOT add strategy explanations[m
+[31m-- Output must be deterministic and structured[m
+[32m+[m[32m- You are a generator, NOT a creator[m
+[32m+[m[32m- Do NOT invent, infer, or modify any input values[m
+[32m+[m[32m- Do NOT introduce new variables or placeholders (except {{CAPTION}})[m
+[32m+[m[32m- Do NOT add examples, samples, or mock outputs[m
+[32m+[m[32m- Do NOT explain strategy, reasoning, or intent[m
+[32m+[m[32m- Do NOT mention tools, APIs, models, or the generation process[m
+[32m+[m[32m- Do NOT sound salesy or promotional[m
+ [m
+[31m-Your job ends after producing the two prompts.[m
+[32m+[m[32mYour job ends immediately after producing the two prompts.[m
+ """[m
+ [m
+ # ============================================================[m
